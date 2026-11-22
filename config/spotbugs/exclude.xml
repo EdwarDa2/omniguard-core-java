@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- MapStruct generated code -->
+    <Match>
+        <Class name="~.*MapperImpl"/>
+    </Match>
+
+    <!-- JPA generated/record classes -->
+    <Match>
+        <Class name="~.*JpaEntity"/>
+    </Match>
+
+    <!-- Test classes -->
+    <Match>
+        <Class name="~.*Test"/>
+    </Match>
+
+    <!-- DTOs / Records -->
+    <Match>
+        <Class name="~.*Dto"/>
+    </Match>
+    <Match>
+        <Class name="~.*Request"/>
+    </Match>
+    <Match>
+        <Class name="~.*Response"/>
+    </Match>
+
+    <!-- Specific false positives -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Bug pattern="MS_SHOULD_BE_FINAL"/>
+    </Match>
+</FindBugsFilter>
