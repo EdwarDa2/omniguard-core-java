@@ -1,0 +1,8 @@
+/*
+ * OmniGuard SOC - Core API
+ * Copyright (c) 2024-2026 OmniGuard Team
+ * All rights reserved.
+ *
+ * This software is proprietary and confidential.
+ * Unauthorized copying, distribution, or modification is strictly prohibited.
+ */

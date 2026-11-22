@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suppressions PUBLIC "-//Puppy Crawl//DTD Suppressions 1.2//EN"
+        "https://checkstyle.org/dtds/suppressions_1_2.dtd">
+
+<suppressions>
+    <!-- Generados por MapStruct -->
+    <suppress files=".*MapperImpl\.java" checks=".*"/>
+    
+    <!-- Generados por JPA/Record -->
+    <suppress files=".*JpaEntity\.java" checks="JavadocType,JavadocMethod,JavadocVariable"/>
+    
+    <!-- Test files - menos estrictos -->
+    <suppress files=".*Test\.java" checks="MethodLength,ParameterNumber,LineLength"/>
+    <suppress files=".*Test\.java" checks="JavadocMethod,JavadocType,JavadocVariable"/>
+    
+    <!-- DTOs / Records - menos estrictos en javadoc -->
+    <suppress files=".*Dto\.java" checks="JavadocType,JavadocMethod,JavadocVariable"/>
+    <suppress files=".*Request\.java" checks="JavadocType,JavadocMethod,JavadocVariable"/>
+    <suppress files=".*Response\.java" checks="JavadocType,JavadocMethod,JavadocVariable"/>
+</suppressions>
