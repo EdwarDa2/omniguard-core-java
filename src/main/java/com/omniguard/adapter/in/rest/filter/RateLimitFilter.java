@@ -1,6 +1,6 @@
 package com.omniguard.adapter.in.rest.filter;
 
-import com.omniguard.config.RateLimitConfig;
+import com.omniguard.config.RateLimitProperties;
 import com.omniguard.config.RateLimitService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -22,6 +22,7 @@ import java.io.IOException;
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private final RateLimitService rateLimitService;
+    private final RateLimitProperties rateLimitProperties;
 
     @Override
     protected void doFilterInternal(
@@ -36,7 +37,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         // Determinar regla según endpoint
         String ruleKey = resolveRuleKey(path, method);
-        RateLimitConfig.RateLimitRule rule = RateLimitConfig.RULES.getOrDefault(ruleKey, RateLimitConfig.RULES.get("api:default"));
+        RateLimitProperties.RateLimitRule rule = rateLimitProperties.getRules().getOrDefault(ruleKey, rateLimitProperties.getRules().get("api:default"));
 
         // Intentar consumir token
         RateLimitService.RateLimitResult result = rateLimitService.tryConsume(ruleKey, identifier, 1);

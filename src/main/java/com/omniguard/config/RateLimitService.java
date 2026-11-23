@@ -1,7 +1,9 @@
 package com.omniguard.config;
 
+import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;
+import io.github.bucket4j.Refill;
 import io.github.bucket4j.distributed.ProxyManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 public class RateLimitService {
 
     private final ProxyManager<String> proxyManager;
+    private final RateLimitProperties properties;
     private final boolean enabled;
 
     private final Map<String, Bucket> localBuckets = new ConcurrentHashMap<>();
@@ -39,7 +42,8 @@ public class RateLimitService {
     }
 
     private Bucket getOrCreateBucket(String ruleKey, String bucketKey) {
-        if (RateLimitConfig.RULES.get(ruleKey) != null && RateLimitConfig.RULES.get(ruleKey).distributed() && proxyManager != null) {
+        RateLimitProperties.RateLimitRule rule = properties.getRules().get(ruleKey);
+        if (rule != null && rule.distributed() && proxyManager != null) {
             return proxyManager.builder().build(bucketKey);
         } else {
             return localBuckets.computeIfAbsent(bucketKey, k -> buildLocalBucket(ruleKey));
@@ -47,7 +51,7 @@ public class RateLimitService {
     }
 
     private Bucket buildLocalBucket(String ruleKey) {
-        RateLimitConfig.RateLimitRule rule = RateLimitConfig.RULES.getOrDefault(ruleKey, RateLimitConfig.RULES.get("api:default"));
+        RateLimitProperties.RateLimitRule rule = properties.getRules().getOrDefault(ruleKey, properties.getRules().get("api:default"));
         return Bucket.builder()
                 .addLimit(Bandwidth.classic(rule.capacity(), Refill.greedy(rule.refillTokens(), rule.refillPeriod())))
                 .build();
