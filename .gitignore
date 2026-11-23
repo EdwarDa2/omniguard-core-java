@@ -1,6 +1,7 @@
 # Carpetas de contexto del agente y documentación interna
 agent/
 context/
+IndormacionDeOtrasCapas/
 
 # Variables de entorno y secretos
 .env

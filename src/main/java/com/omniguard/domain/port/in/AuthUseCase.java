@@ -3,7 +3,6 @@ package com.omniguard.domain.port.in;
 import com.omniguard.domain.model.User;
 import com.omniguard.domain.vo.Email;
 import com.omniguard.domain.vo.Username;
-import java.util.UUID;
 
 public interface AuthUseCase {
     /**
@@ -29,22 +28,22 @@ public interface AuthUseCase {
     /**
      * Obtiene el usuario actual desde el access token.
      */
-    User me(UUID userId);
+    User me(Long userId);
 
     /**
      * Revoca todas las sesiones de un usuario (admin o cambio de password).
      */
-    void revokeAllSessions(UUID userId);
+    void revokeAllSessions(Long userId);
 
     /**
      * Cambia la contraseña del usuario actual.
      */
-    void changePassword(UUID userId, String currentPassword, String newPassword);
+    void changePassword(Long userId, String currentPassword, String newPassword);
 
     /**
      * Habilita/deshabilita 2FA TOTP.
      */
-    User toggleTotp(UUID userId, boolean enable);
+    User toggleTotp(Long userId, boolean enable);
 
     record AuthResult(
             User user,

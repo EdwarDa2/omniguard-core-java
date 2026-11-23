@@ -6,31 +6,30 @@ import com.omniguard.domain.vo.Email;
 import com.omniguard.domain.vo.Username;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 public interface UserUseCase {
-    Optional<User> findById(UUID id);
+    Optional<User> findById(Long id);
 
-    User getMe(UUID userId);
+    User getMe(Long userId);
 
-    User updateProfile(UUID userId, Username username, Email email);
+    User updateProfile(Long userId, Username username, Email email);
 
-    void changePassword(UUID userId, String currentPassword, String newPassword);
+    void changePassword(Long userId, String currentPassword, String newPassword);
 
-    User toggleTotp(UUID userId, boolean enable);
+    User toggleTotp(Long userId, boolean enable);
 
-    // Admin operations
+    // Operaciones administrativas
     List<User> findAllUsers(int page, int size);
 
     User createUser(Username username, Email email, String password, String roleName);
 
-    User updateUser(UUID id, Username username, Email email, String roleName, boolean isActive);
+    User updateUser(Long id, Username username, Email email, String roleName, boolean isActive);
 
-    void deleteUser(UUID id);
+    void deleteUser(Long id);
 
     List<Role> findAllRoles();
 
     Role createRole(String name, String description);
 
-    void deleteRole(UUID id);
+    void deleteRole(Long id);
 }

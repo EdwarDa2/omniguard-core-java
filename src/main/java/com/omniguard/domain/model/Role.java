@@ -1,19 +1,18 @@
 package com.omniguard.domain.model;
 
 import java.time.Instant;
-import java.util.UUID;
 
 public record Role(
-        UUID id,
+        Long id,
         String name,
         String description,
         Instant createdAt
 ) {
     public static Role create(String name, String description) {
-        return new Role(UUID.randomUUID(), name, description, Instant.now());
+        return new Role(null, name, description, Instant.now());
     }
 
-    public static Role of(UUID id, String name) {
+    public static Role of(Long id, String name) {
         return new Role(id, name, null, null);
     }
 

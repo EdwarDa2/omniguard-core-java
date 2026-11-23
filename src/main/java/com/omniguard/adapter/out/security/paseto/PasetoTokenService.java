@@ -186,7 +186,7 @@ public class PasetoTokenService {
         });
     }
 
-    public void revokeAllUserSessions(UUID userId) {
+    public void revokeAllUserSessions(Long userId) {
         sessionRepository.findByUserId(userId).forEach(session -> {
             if (session.revokedAt() == null) {
                 sessionRepository.save(new com.omniguard.domain.model.PasetoSession(

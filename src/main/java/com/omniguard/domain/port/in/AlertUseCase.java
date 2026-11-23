@@ -5,28 +5,26 @@ import com.omniguard.domain.vo.IpAddress;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 public interface AlertUseCase {
     Alert create(Alert alert);
 
-    Optional<Alert> findById(UUID id);
+    Optional<Alert> findById(Long id);
 
     List<Alert> findAll(AlertFilter filter, int page, int size);
 
     long count(AlertFilter filter);
 
-    Alert updateStatus(UUID id, String status, UUID assignedTo, String resolutionNotes);
+    Alert updateStatus(Long id, String status, Long assignedTo, String resolutionNotes);
 
     AlertStats getStats();
 
     /**
      * Stream de alertas en tiempo real (SSE/WebSocket).
-     * Implementación en adapter.in.rest.sse o adapter.in.rest.websocket.
      */
     interface AlertStream {
-        void subscribe(UUID userId, AlertStreamHandler handler);
-        void unsubscribe(UUID userId);
+        void subscribe(Long userId, AlertStreamHandler handler);
+        void unsubscribe(Long userId);
     }
 
     interface AlertStreamHandler {
@@ -38,7 +36,7 @@ public interface AlertUseCase {
             String status,
             String severity,
             String threatType,
-            UUID assetId,
+            Long assetId,
             IpAddress sourceIp,
             IpAddress destinationIp,
             Instant from,

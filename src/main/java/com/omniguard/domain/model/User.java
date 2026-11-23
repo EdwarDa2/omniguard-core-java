@@ -3,10 +3,9 @@ package com.omniguard.domain.model;
 import com.omniguard.domain.vo.Email;
 import com.omniguard.domain.vo.Username;
 import java.time.Instant;
-import java.util.UUID;
 
 public record User(
-        UUID id,
+        Long id,
         Role role,
         Username username,
         Email email,
@@ -26,7 +25,7 @@ public record User(
     ) {
         Instant now = Instant.now();
         return new User(
-                UUID.randomUUID(),
+                null,
                 role,
                 username,
                 email,
@@ -37,6 +36,22 @@ public record User(
                 null,
                 now,
                 now
+        );
+    }
+
+    public User withId(Long id) {
+        return new User(
+                id,
+                this.role,
+                this.username,
+                this.email,
+                this.passwordHash,
+                this.isActive,
+                this.totpSecret,
+                this.totpEnabled,
+                this.lastLoginAt,
+                this.createdAt,
+                this.updatedAt
         );
     }
 

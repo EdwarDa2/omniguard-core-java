@@ -1,10 +1,8 @@
 package com.omniguard.domain.vo;
 
-import jakarta.persistence.Embeddable;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
-@Embeddable
 public record CveId(String value) {
     private static final Pattern CVE_PATTERN =
             Pattern.compile("^CVE-\\d{4}-\\d{4,}$", Pattern.CASE_INSENSITIVE);

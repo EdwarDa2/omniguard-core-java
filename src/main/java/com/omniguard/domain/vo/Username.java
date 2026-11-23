@@ -1,10 +1,8 @@
 package com.omniguard.domain.vo;
 
-import jakarta.persistence.Embeddable;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
-@Embeddable
 public record Username(String value) {
     private static final Pattern USERNAME_PATTERN =
             Pattern.compile("^[a-zA-Z0-9_.-]{3,50}$");

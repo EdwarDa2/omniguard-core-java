@@ -1,11 +1,9 @@
 package com.omniguard.domain.vo;
 
-import jakarta.persistence.Embeddable;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Objects;
 
-@Embeddable
 public record IpAddress(String value) {
     public IpAddress {
         if (value == null || value.isBlank()) {
