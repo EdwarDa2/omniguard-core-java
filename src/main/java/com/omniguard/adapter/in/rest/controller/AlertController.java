@@ -6,6 +6,7 @@ import com.omniguard.adapter.in.rest.dto.request.NidsAlertRequestDto;
 import com.omniguard.adapter.in.rest.dto.request.UpdateAlertStatusRequestDto;
 import com.omniguard.adapter.in.rest.dto.response.AlertResponseDto;
 import com.omniguard.adapter.in.rest.dto.response.AlertStatsResponseDto;
+import com.omniguard.adapter.in.rest.sse.AlertSseService;
 import com.omniguard.domain.exception.EntityNotFoundException;
 import com.omniguard.domain.model.Alert;
 import com.omniguard.domain.model.Severity;
@@ -19,6 +20,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -28,18 +30,25 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 @RequestMapping("/api/v1")
-@Tag(name = "Alertas NIDS", description = "Endpoints de ingesta M2M (Python) y consulta de incidentes (Blue Team)")
+@Tag(name = "Alertas NIDS", description = "Endpoints de ingesta M2M (Python), consulta y streaming SSE en tiempo real")
 public class AlertController {
 
     private final AlertUseCase alertUseCase;
     private final ObjectMapper objectMapper;
+    private final AlertSseService alertSseService;
 
-    public AlertController(AlertUseCase alertUseCase, ObjectMapper objectMapper) {
+    public AlertController(
+            AlertUseCase alertUseCase,
+            ObjectMapper objectMapper,
+            AlertSseService alertSseService
+    ) {
         this.alertUseCase = alertUseCase;
         this.objectMapper = objectMapper;
+        this.alertSseService = alertSseService;
     }
 
     @PostMapping("/internal/alerts")
@@ -76,10 +85,19 @@ public class AlertController {
 
         Alert saved = alertUseCase.create(domainAlert);
 
+        // Notificar en tiempo real a los navegadores conectados por SSE
+        alertSseService.broadcastNewAlert(AlertResponseDto.fromDomain(saved));
+
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                 "status", "CREATED",
                 "alert_id", saved.id()
         ));
+    }
+
+    @GetMapping(value = "/alerts/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(summary = "Stream SSE en tiempo real", description = "Flujo continuo Server-Sent Events para el monitor en vivo del frontend")
+    public SseEmitter streamAlerts() {
+        return alertSseService.registerClient();
     }
 
     @GetMapping("/alerts")
@@ -134,6 +152,9 @@ public class AlertController {
                 request.assignedTo(),
                 request.resolutionNotes()
         );
+
+        // Notificar cambio de estado por SSE
+        alertSseService.broadcastAlertUpdate(id, updated.status());
 
         return ResponseEntity.ok(AlertResponseDto.fromDomain(updated));
     }
