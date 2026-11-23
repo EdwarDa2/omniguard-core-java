@@ -262,12 +262,21 @@ public class PasetoTokenService {
     }
 
     private String extractJson(String json, String key) {
+        // 1. Strings: "key": "value"
         String pattern = "\"" + key + "\"\\s*:\\s*\"([^\"]+)\"";
         java.util.regex.Matcher m = java.util.regex.Pattern.compile(pattern).matcher(json);
         if (m.find()) return m.group(1);
+
+        // 2. Arrays: "key": ["item1", ...] o "key": []
+        pattern = "\"" + key + "\"\\s*:\\s*(\\[.*?\\])";
+        m = java.util.regex.Pattern.compile(pattern, java.util.regex.Pattern.DOTALL).matcher(json);
+        if (m.find()) return m.group(1);
+
+        // 3. Numbers: "key": 12345
         pattern = "\"" + key + "\"\\s*:\\s*(\\d+)";
         m = java.util.regex.Pattern.compile(pattern).matcher(json);
         if (m.find()) return m.group(1);
+
         return null;
     }
 
