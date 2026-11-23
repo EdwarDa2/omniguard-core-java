@@ -28,9 +28,14 @@ import java.util.List;
 public class SecurityConfig {
 
     private final PasetoTokenService pasetoTokenService;
+    private final com.omniguard.adapter.in.rest.security.InternalApiTokenFilter internalApiTokenFilter;
 
-    public SecurityConfig(PasetoTokenService pasetoTokenService) {
+    public SecurityConfig(
+            PasetoTokenService pasetoTokenService,
+            com.omniguard.adapter.in.rest.security.InternalApiTokenFilter internalApiTokenFilter
+    ) {
         this.pasetoTokenService = pasetoTokenService;
+        this.internalApiTokenFilter = internalApiTokenFilter;
     }
 
     @Bean
@@ -53,9 +58,11 @@ public class SecurityConfig {
                 .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/refresh", "/api/v1/auth/logout").permitAll()
+                .requestMatchers("/api/v1/internal/**").hasAuthority("ROLE_INTERNAL")
                 .requestMatchers("/api/v1/alerts/stream").authenticated()
                 .anyRequest().authenticated()
             )
+            .addFilterBefore(internalApiTokenFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(pasetoAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
             .headers(headers -> headers
                 .contentSecurityPolicy(csp -> csp.policyDirectives(

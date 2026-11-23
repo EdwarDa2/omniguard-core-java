@@ -10,6 +10,10 @@ import java.util.Optional;
 public interface AssetUseCase {
     Asset create(IpAddress ipAddress, String hostname);
 
+    default Asset create(IpAddress ipAddress, String hostname, String description, String os) {
+        return create(ipAddress, hostname);
+    }
+
     Optional<Asset> findById(Long id);
 
     Optional<Asset> findByIpAddress(IpAddress ipAddress);
@@ -20,9 +24,19 @@ public interface AssetUseCase {
 
     Asset update(Long id, String hostname, String status);
 
+    default Asset update(Long id, String hostname, String description, String os, String status) {
+        return update(id, hostname, status);
+    }
+
     void delete(Long id);
 
     void triggerScan(Long assetId);
+
+    default void triggerScan(Long assetId, String ports) {
+        triggerScan(assetId);
+    }
+
+    void triggerScanAll(String ports);
 
     List<OpenPort> getPorts(Long assetId);
 
