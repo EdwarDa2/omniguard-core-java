@@ -39,6 +39,7 @@ configurations {
 }
 
 dependencies {
+    implementation("io.github.nbaars:paseto4j-version4:2024.3")
     // ============================================================
     // Spring Boot Starters
     // ============================================================

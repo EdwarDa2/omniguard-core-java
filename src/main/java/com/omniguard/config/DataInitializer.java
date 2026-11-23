@@ -30,7 +30,7 @@ public class DataInitializer implements ApplicationRunner {
     @Value("${admin.initial.email:admin@omniguard.local}")
     private String adminEmail;
 
-    @Value("${admin.initial.password:OmniGuardAdmin2026!}")
+    @Value("${admin.initial.password:}")
     private String adminPassword;
 
     public DataInitializer(
@@ -46,6 +46,9 @@ public class DataInitializer implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
+        if (adminPassword == null || adminPassword.isBlank()) {
+            throw new IllegalStateException("ADMIN_INITIAL_PASSWORD debe estar configurada");
+        }
         initializeRoles();
         initializeAdminUser();
     }

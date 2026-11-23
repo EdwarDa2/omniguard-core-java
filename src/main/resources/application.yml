@@ -211,3 +211,13 @@ app:
   audit:
     enabled: true
     async: true
+
+internal:
+  api:
+    token: ${INTERNAL_API_TOKEN:}
+
+admin:
+  initial:
+    username: ${ADMIN_INITIAL_USERNAME:admin}
+    email: ${ADMIN_INITIAL_EMAIL:admin@omniguard.local}
+    password: ${ADMIN_INITIAL_PASSWORD:}

@@ -10,10 +10,17 @@ import com.omniguard.adapter.out.persistence.repository.SpringDataNotificationCo
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,6 +36,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class NotificationSettingsController {
 
     private final SpringDataNotificationConfigRepository configRepository;
+    private final RestClient restClient;
 
     // Reglas en memoria sincronizadas con la base de datos
     private boolean ruleCritical = true;
@@ -36,8 +44,15 @@ public class NotificationSettingsController {
     private boolean ruleMedium = false;
     private boolean ruleLow = false;
 
-    public NotificationSettingsController(SpringDataNotificationConfigRepository configRepository) {
+    public NotificationSettingsController(
+            SpringDataNotificationConfigRepository configRepository,
+            RestClient.Builder restClientBuilder
+    ) {
         this.configRepository = configRepository;
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofSeconds(10));
+        requestFactory.setReadTimeout(Duration.ofSeconds(10));
+        this.restClient = restClientBuilder.requestFactory(requestFactory).build();
     }
 
     @GetMapping
@@ -75,6 +90,13 @@ public class NotificationSettingsController {
     public ResponseEntity<Map<String, Object>> updateDiscordWebhook(
             @Valid @RequestBody UpdateDiscordRequestDto request
     ) {
+        if (!isValidDiscordWebhook(request.webhookUrl())) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "ERROR",
+                    "message", "El webhook debe usar HTTPS y pertenecer a discord.com"
+            ));
+        }
+
         List<NotificationConfigJpaEntity> existing = configRepository.findByPlatformIgnoreCase("DISCORD");
         NotificationConfigJpaEntity entity;
         if (!existing.isEmpty()) {
@@ -162,15 +184,81 @@ public class NotificationSettingsController {
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Operation(summary = "Enviar alerta de prueba", description = "Prueba el canal de comunicación emitiendo una notificación de verificación")
     public ResponseEntity<NotificationTestResponseDto> testChannel(@PathVariable String channel) {
-        String msg = "discord".equalsIgnoreCase(channel)
-                ? "✓ Alerta de prueba entregada en canal #soc-blue-team"
-                : "✓ Mensaje recibido por el bot del Blue Team";
+        if (!"discord".equalsIgnoreCase(channel)) {
+            return ResponseEntity.badRequest().body(
+                    new NotificationTestResponseDto(channel.toLowerCase(), false, "Canal no soportado")
+            );
+        }
 
-        return ResponseEntity.ok(new NotificationTestResponseDto(channel.toLowerCase(), true, msg));
+        List<NotificationConfigJpaEntity> discordConfigs =
+                configRepository.findByPlatformIgnoreCaseAndIsActiveTrue("DISCORD");
+        if (discordConfigs.isEmpty()
+                || discordConfigs.get(0).getWebhookUrl() == null
+                || discordConfigs.get(0).getWebhookUrl().isBlank()) {
+            return ResponseEntity.status(HttpStatus.PRECONDITION_FAILED).body(
+                    new NotificationTestResponseDto("discord", false, "No hay un webhook de Discord configurado")
+            );
+        }
+
+        try {
+            restClient.post()
+                    .uri(discordConfigs.get(0).getWebhookUrl())
+                    .body(Map.of(
+                            "username", "OmniGuard SOC",
+                            "content", "✅ Alerta de prueba: el canal de Discord está configurado correctamente."
+                    ))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RestClientException exception) {
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(
+                    new NotificationTestResponseDto(
+                            "discord",
+                            false,
+                            "Discord rechazó o no recibió la alerta de prueba"
+                    )
+            );
+        }
+
+        return ResponseEntity.ok(new NotificationTestResponseDto(
+                "discord",
+                true,
+                "Alerta de prueba entregada en Discord"
+        ));
     }
 
     private String maskUrl(String url) {
         if (url == null || url.length() <= 20) return "****************";
         return url.substring(0, url.lastIndexOf('/') + 1) + "*********";
+    }
+
+    private boolean isValidDiscordWebhook(String webhookUrl) {
+        if (webhookUrl == null || webhookUrl.isBlank()) {
+            return false;
+        }
+
+        try {
+            URI uri = new URI(webhookUrl);
+            if (!"https".equalsIgnoreCase(uri.getScheme())) {
+                return false;
+            }
+
+            String host = uri.getHost();
+            if (host == null) {
+                return false;
+            }
+
+            boolean officialHost = "discord.com".equalsIgnoreCase(host)
+                    || "discordapp.com".equalsIgnoreCase(host);
+            if (!officialHost) {
+                return false;
+            }
+
+            return uri.getPort() == -1
+                    && uri.getPath().matches("^/api(/v\\d+)?/webhooks/[0-9]+/[^/?#]+$")
+                    && uri.getRawQuery() == null
+                    && uri.getFragment() == null;
+        } catch (URISyntaxException exception) {
+            return false;
+        }
     }
 }

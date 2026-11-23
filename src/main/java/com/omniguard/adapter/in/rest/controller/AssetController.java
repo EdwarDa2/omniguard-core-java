@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -93,6 +94,7 @@ public class AssetController {
     }
 
     @PostMapping("/{id}/scan")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('ROLE_ANALYST')")
     public ResponseEntity<ScanResponseDto> triggerScan(
             @PathVariable Long id,
             @RequestBody(required = false) TriggerScanRequestDto request
@@ -113,6 +115,7 @@ public class AssetController {
     }
 
     @PostMapping("/scan-all")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('ROLE_ANALYST')")
     public ResponseEntity<ScanResponseDto> triggerScanAll(
             @RequestBody(required = false) TriggerScanRequestDto request
     ) {
@@ -129,6 +132,7 @@ public class AssetController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('ROLE_ANALYST')")
     public ResponseEntity<AssetResponseDto> createAsset(@Valid @RequestBody CreateAssetRequestDto request) {
         Asset created = assetUseCase.create(
                 IpAddress.of(request.ip()),
@@ -140,6 +144,7 @@ public class AssetController {
     }
 
     @PatchMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('ROLE_ANALYST')")
     public ResponseEntity<AssetResponseDto> updateAsset(
             @PathVariable Long id,
             @RequestBody UpdateAssetRequestDto request
@@ -155,6 +160,7 @@ public class AssetController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Void> deleteAsset(@PathVariable Long id) {
         assetUseCase.delete(id);
         return ResponseEntity.noContent().build();

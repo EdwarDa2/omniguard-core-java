@@ -3,27 +3,45 @@ package com.omniguard.adapter.out.security.paseto;
 import com.omniguard.domain.model.User;
 import com.omniguard.domain.port.out.PasetoSessionRepository;
 import jakarta.annotation.PostConstruct;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.paseto4j.commons.PrivateKey;
+import org.paseto4j.commons.PublicKey;
+import org.paseto4j.commons.SecretKey;
+import org.paseto4j.commons.Version;
+import org.paseto4j.version4.Paseto;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.NoSuchAlgorithmException;
+import java.security.SignatureException;
+import java.security.KeyFactory;
+import java.security.interfaces.EdECPrivateKey;
 import java.security.interfaces.EdECPublicKey;
-import java.security.spec.InvalidKeySpecException;
+import java.security.spec.EdECPrivateKeySpec;
+import java.security.spec.EdECPublicKeySpec;
+import java.security.spec.EdECPoint;
+import java.security.spec.NamedParameterSpec;
+import java.math.BigInteger;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.UUID;
+import java.security.Security;
 
 @Service
 public class PasetoTokenService {
 
     private static final Logger log = LoggerFactory.getLogger(PasetoTokenService.class);
+    static {
+        if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
+            Security.addProvider(new BouncyCastleProvider());
+        }
+    }
 
     // PASETO v4.local (symmetric) for access tokens - XChaCha20-Poly1305
     // PASETO v4.public (asymmetric) for refresh tokens - Ed25519
@@ -35,8 +53,9 @@ public class PasetoTokenService {
     private final Duration refreshTokenTtl;
 
     // Keys (en producción: cargar desde Docker Secrets / Vault)
-    private byte[] localKey;      // 32 bytes para v4.local
-    private KeyPair keyPair;      // Ed25519 para v4.public
+    private byte[] localKey;
+    private PrivateKey privateKey;
+    private PublicKey publicKey;
 
     public PasetoTokenService(
             PasetoSessionRepository sessionRepository,
@@ -55,20 +74,53 @@ public class PasetoTokenService {
             this.localKey = Base64.getDecoder().decode(localKeyB64);
         }
         if (publicKeyB64 != null && !publicKeyB64.isBlank() && privateKeyB64 != null && !privateKeyB64.isBlank()) {
-            // Cargar key pair desde base64
-            // Implementación simplificada - en producción usar KeyFactory
+            try {
+                byte[] privateBytes = Base64.getDecoder().decode(privateKeyB64);
+                byte[] publicBytes = Base64.getDecoder().decode(publicKeyB64);
+                if (privateBytes.length != 32 || publicBytes.length != 32) {
+                    throw new IllegalArgumentException("Las claves Ed25519 deben tener 32 bytes");
+                }
+
+                NamedParameterSpec parameterSpec = new NamedParameterSpec("Ed25519");
+                KeyFactory keyFactory = KeyFactory.getInstance("Ed25519");
+                EdECPrivateKeySpec privateSpec =
+                        new EdECPrivateKeySpec(parameterSpec, privateBytes);
+
+                byte[] littleEndian = publicBytes.clone();
+                boolean xisOdd = (littleEndian[0] & 1) != 0;
+                littleEndian[0] &= 0xFE;
+                byte[] reversed = new byte[littleEndian.length];
+                for (int i = 0; i < littleEndian.length; i++) {
+                    reversed[i] = littleEndian[littleEndian.length - 1 - i];
+                }
+                EdECPoint publicPoint = new EdECPoint(xisOdd, new BigInteger(1, reversed));
+                EdECPublicKeySpec publicSpec =
+                        new EdECPublicKeySpec(parameterSpec, publicPoint);
+
+                EdECPrivateKey javaPrivateKey =
+                        (EdECPrivateKey) keyFactory.generatePrivate(privateSpec);
+                EdECPublicKey javaPublicKey =
+                        (EdECPublicKey) keyFactory.generatePublic(publicSpec);
+                this.privateKey = new PrivateKey(javaPrivateKey, Version.V4);
+                this.publicKey = new PublicKey(javaPublicKey, Version.V4);
+            } catch (Exception exception) {
+                throw new IllegalStateException("Clave PASETO Ed25519 inválida", exception);
+            }
         }
     }
 
     @PostConstruct
     public void init() {
         if (localKey == null) {
-            localKey = generateLocalKey();
-            log.warn("PASETO local key generada automáticamente. En producción configure paseto.local-key via secret.");
+            throw new IllegalStateException("PASETO_LOCAL_KEY debe configurarse con 32 bytes codificados en Base64");
         }
-        if (keyPair == null) {
-            keyPair = generateKeyPair();
-            log.warn("PASETO key pair generada automáticamente. En producción configure paseto.public-key y paseto.private-key via secrets.");
+        if (localKey.length != 32) {
+            throw new IllegalStateException("PASETO_LOCAL_KEY debe contener exactamente 32 bytes");
+        }
+        if (privateKey == null || publicKey == null) {
+            throw new IllegalStateException(
+                    "PASETO_PUBLIC_KEY y PASETO_PRIVATE_KEY deben configurarse"
+            );
         }
     }
 
@@ -104,7 +156,12 @@ public class PasetoTokenService {
 
     public PasetoClaims validateAccessToken(String token) {
         String payload = decryptLocal(token, localKey);
-        return parseClaims(payload);
+        PasetoClaims claims = parseClaims(payload);
+        validateCommonClaims(claims);
+        if (!"access".equals(claims.type())) {
+            throw new com.omniguard.domain.exception.AuthenticationFailedException("Tipo de token inválido");
+        }
+        return claims;
     }
 
     // ============================================================
@@ -134,7 +191,7 @@ public class PasetoTokenService {
                 deviceFingerprint != null ? deviceFingerprint.replace("\"", "\\\"") : "unknown"
         );
 
-        String token = signPublic(payload, keyPair.getPrivate());
+        String token = signPublic(payload, privateKey);
 
         // Guardar hash en BD para revocación
         com.omniguard.domain.model.PasetoSession session = new com.omniguard.domain.model.PasetoSession(
@@ -154,8 +211,12 @@ public class PasetoTokenService {
     }
 
     public PasetoClaims validateRefreshToken(String token) {
-        String payload = verifyPublic(token, keyPair.getPublic());
+        String payload = verifyPublic(token, publicKey);
         PasetoClaims claims = parseClaims(payload);
+        validateCommonClaims(claims);
+        if (!"refresh".equals(claims.type())) {
+            throw new com.omniguard.domain.exception.AuthenticationFailedException("Tipo de token inválido");
+        }
 
         // Verificar en BD que no esté revocado
         UUID jti = UUID.fromString(claims.jti());
@@ -205,79 +266,73 @@ public class PasetoTokenService {
     }
 
     // ============================================================
-    // Crypto Helpers (Implementación real usaría paseto-java o Tink)
+    // Crypto Helpers
     // ============================================================
-    private byte[] generateLocalKey() {
-        byte[] key = new byte[32];
-        new java.security.SecureRandom().nextBytes(key);
-        return key;
-    }
-
-    private KeyPair generateKeyPair() {
-        try {
-            KeyPairGenerator kpg = KeyPairGenerator.getInstance("Ed25519");
-            return kpg.generateKeyPair();
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("Ed25519 no disponible", e);
-        }
-    }
-
     private String encryptLocal(String payload, byte[] key) {
-        // TODO: Implementar con paseto-java v4.local (XChaCha20-Poly1305)
-        // Placeholder: Base64.encode(payload) + "." + Base64.encode(key) - NO USAR EN PRODUCCIÓN
-        return "v4.local." + Base64.getUrlEncoder().withoutPadding().encodeToString(payload.getBytes(StandardCharsets.UTF_8));
+        return Paseto.encrypt(new SecretKey(key, Version.V4), payload, "");
     }
 
     private String decryptLocal(String token, byte[] key) {
-        // TODO: Implementar validación y descifrado real
-        if (!token.startsWith("v4.local.")) {
+        if (token == null || !token.startsWith("v4.local.")) {
             throw new com.omniguard.domain.exception.AuthenticationFailedException("Token inválido");
         }
-        String payload = new String(Base64.getUrlDecoder().decode(token.substring(9)), StandardCharsets.UTF_8);
-        return payload;
+        try {
+            return Paseto.decrypt(new SecretKey(key, Version.V4), token, "");
+        } catch (RuntimeException exception) {
+            throw new com.omniguard.domain.exception.AuthenticationFailedException("Token inválido");
+        }
     }
 
-    private String signPublic(String payload, java.security.PrivateKey privateKey) {
-        // TODO: Implementar con paseto-java v4.public (Ed25519)
-        return "v4.public." + Base64.getUrlEncoder().withoutPadding().encodeToString(payload.getBytes(StandardCharsets.UTF_8));
+    private String signPublic(String payload, PrivateKey key) {
+        return Paseto.sign(key, payload, "");
     }
 
-    private String verifyPublic(String token, java.security.PublicKey publicKey) {
+    private String verifyPublic(String token, PublicKey key) {
         if (!token.startsWith("v4.public.")) {
             throw new com.omniguard.domain.exception.AuthenticationFailedException("Token inválido");
         }
-        return new String(Base64.getUrlDecoder().decode(token.substring(10)), StandardCharsets.UTF_8);
+        try {
+            return Paseto.parse(key, token, "");
+        } catch (SignatureException | RuntimeException exception) {
+            throw new com.omniguard.domain.exception.AuthenticationFailedException("Firma de token inválida");
+        }
     }
 
     private PasetoClaims parseClaims(String payload) {
-        // TODO: Parsear JSON real (Jackson/JSON-B)
-        // Placeholder simple
-        return new PasetoClaims(
-                extractJson(payload, "sub"),
-                extractJson(payload, "jti"),
-                extractJson(payload, "exp"),
-                extractJson(payload, "type"),
-                extractJson(payload, "roles")
-        );
+        try {
+            JsonNode claims = new ObjectMapper().readTree(payload);
+            String roles = claims.has("roles") ? claims.get("roles").toString() : "[]";
+            PasetoClaims parsed = new PasetoClaims(
+                    claims.path("sub").asText(null),
+                    claims.path("jti").asText(null),
+                    claims.path("exp").asText(null),
+                    claims.path("type").asText(null),
+                    roles
+            );
+            validateCommonClaims(parsed);
+            return parsed;
+        } catch (com.omniguard.domain.exception.AuthenticationFailedException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw new com.omniguard.domain.exception.AuthenticationFailedException("Claims inválidos");
+        }
     }
 
-    private String extractJson(String json, String key) {
-        // 1. Strings: "key": "value"
-        String pattern = "\"" + key + "\"\\s*:\\s*\"([^\"]+)\"";
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile(pattern).matcher(json);
-        if (m.find()) return m.group(1);
+    private void validateCommonClaims(PasetoClaims claims) {
+        if (claims.sub() == null || claims.jti() == null || claims.exp() == null) {
+            throw new com.omniguard.domain.exception.AuthenticationFailedException(
+                    "Claims obligatorios ausentes"
+            );
+        }
 
-        // 2. Arrays: "key": ["item1", ...] o "key": []
-        pattern = "\"" + key + "\"\\s*:\\s*(\\[.*?\\])";
-        m = java.util.regex.Pattern.compile(pattern, java.util.regex.Pattern.DOTALL).matcher(json);
-        if (m.find()) return m.group(1);
-
-        // 3. Numbers: "key": 12345
-        pattern = "\"" + key + "\"\\s*:\\s*(\\d+)";
-        m = java.util.regex.Pattern.compile(pattern).matcher(json);
-        if (m.find()) return m.group(1);
-
-        return null;
+        try {
+            long expiration = Long.parseLong(claims.exp());
+            if (Instant.now().getEpochSecond() >= expiration) {
+                throw new com.omniguard.domain.exception.AuthenticationFailedException("Token expirado");
+            }
+        } catch (NumberFormatException exception) {
+            throw new com.omniguard.domain.exception.AuthenticationFailedException("Expiración inválida");
+        }
     }
 
     private String hashToken(String token) {

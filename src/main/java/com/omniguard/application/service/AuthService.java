@@ -79,9 +79,10 @@ public class AuthService implements AuthUseCase {
             throw new BusinessRuleViolationException("El correo electrónico ya está registrado");
         }
 
-        String targetRole = (roleName != null && !roleName.isBlank()) ? roleName.trim() : "ROLE_ANALYST";
-        Role role = roleRepository.findByName(targetRole)
-                .orElseGet(() -> roleRepository.save(Role.create(targetRole, "Rol asignado automáticamente")));
+        Role role = roleRepository.findByName("ROLE_ANALYST")
+                .orElseGet(() -> roleRepository.save(
+                        Role.create("ROLE_ANALYST", "Analista de Ciberseguridad / Blue Team")
+                ));
 
         String passwordHash = passwordEncoder.encode(password);
         User newUser = User.create(role, username, email, passwordHash);

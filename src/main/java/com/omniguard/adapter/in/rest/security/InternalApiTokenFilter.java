@@ -25,7 +25,7 @@ public class InternalApiTokenFilter extends OncePerRequestFilter {
     private final String expectedToken;
 
     public InternalApiTokenFilter(
-            @Value("${internal.api.token:omniguard_m2m_secret_token_dev_2026}") String expectedToken
+            @Value("${internal.api.token}") String expectedToken
     ) {
         this.expectedToken = expectedToken;
     }
@@ -45,7 +45,7 @@ public class InternalApiTokenFilter extends OncePerRequestFilter {
                     new UsernamePasswordAuthenticationToken(
                             "internal-m2m",
                             null,
-                            List.of(new SimpleGrantedAuthority("ROLE_INTERNAL"), new SimpleGrantedAuthority("ROLE_ADMIN"))
+                            List.of(new SimpleGrantedAuthority("ROLE_INTERNAL"))
                     );
             SecurityContextHolder.getContext().setAuthentication(authentication);
         } else if (path.startsWith("/api/v1/internal/")) {

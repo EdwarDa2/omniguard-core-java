@@ -10,7 +10,6 @@ WORKDIR /app
 
 # Copiar archivos de configuración de Gradle primero (cache de dependencias)
 COPY build.gradle.kts settings.gradle.kts gradle.properties* ./
-COPY gradle ./gradle
 
 # Descargar dependencias (cache layer)
 RUN gradle dependencies --no-daemon
