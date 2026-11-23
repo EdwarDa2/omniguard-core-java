@@ -6,6 +6,7 @@ plugins {
     id("spotbugs")
     id("com.diffplug.spotless") version "6.25.0"
     id("org.owasp.dependencycheck") version "9.0.1"
+    id("pl.piomin.plugins.pitest") version "1.0.0"
 }
 
 java {
@@ -113,6 +114,11 @@ dependencies {
     testImplementation("org.assertj:assertj-core:3.24.2")
     testImplementation("nl.jqno.equalsverifier:equalsverifier:3.15.1")
 
+    // Pact Contract Testing
+    testImplementation("au.com.dius.pact.consumer:junit5:4.6.0")
+    testImplementation("au.com.dius.pact.provider:junit5:4.6.0")
+    testImplementation("au.com.dius.pact.provider:spring:4.6.0")
+
     // Integration test specific
     integrationTestImplementation("org.springframework.boot:spring-boot-starter-test")
     integrationTestImplementation("org.testcontainers:junit-jupiter:1.19.3")
@@ -214,8 +220,74 @@ tasks.register<Test>("integrationTest") {
     }
 }
 
+// ============================================================
+// Mutation Testing (Pitest)
+// ============================================================
+tasks.register<pl.piomin.plugins.pitest.PitestTask>("pitest") {
+    description = "Runs mutation testing with Pitest"
+    group = "verification"
+    targetClasses = listOf("com.omniguard.domain.*", "com.omniguard.application.*")
+    mutators = listOf(
+        "CONDITIONALS_BOUNDARY", "INCREMENTS", "INVERT_NEGS",
+        "MATH", "NEGATE_CONDITIONALS", "VOID_METHOD_CALLS",
+        "RETURN_VALS", "EXPERIMENTAL_MEMBER_VARIABLE", "EXPERIMENTAL_SWITCH"
+    )
+    minimumScore = 70
+    maximumScore = 100
+    outputFormats = listOf("HTML", "XML", "CSV")
+    timestampedReports = false
+    verbose = true
+    threads = 4
+    // Exclude generated code and configuration classes
+    excludedClasses = listOf(
+        "com.omniguard.adapter.out.persistence.entity.*",
+        "com.omniguard.adapter.in.rest.dto.*",
+        "com.omniguard.adapter.in.rest.mapper.*",
+        "com.omniguard.config.*",
+        "com.omniguard.domain.vo.*",
+        "com.omniguard.domain.exception.*",
+        "com.omniguard.domain.model.*"
+    )
+    // Only mutate domain and application logic
+    includedClasses = listOf(
+        "com.omniguard.domain.model.*",
+        "com.omniguard.application.service.*"
+    )
+}
+
 tasks.check {
-    dependsOn(tasks.integrationTest)
+    dependsOn(tasks.integrationTest, tasks.pitest)
+}
+
+// ============================================================
+// Pact Contract Testing Tasks
+// ============================================================
+tasks.register<Test>("pactTest") {
+    description = "Runs Pact consumer contract tests"
+    group = "verification"
+    useJUnitPlatform()
+    systemProperty("pact.rootDir", "build/pacts")
+    systemProperty("pact.writer.overwrite", "true")
+    testLogging {
+        events("passed", "skipped", "failed", "standardOut", "standardError")
+    }
+}
+
+tasks.register<Test>("pactVerify") {
+    description = "Runs Pact provider verification tests"
+    group = "verification"
+    useJUnitPlatform()
+    systemProperty("pact.rootDir", "build/pacts")
+    systemProperty("pact.verifier.publishResults", "false")
+    testLogging {
+        events("passed", "skipped", "failed", "standardOut", "standardError")
+    }
+    // Run after integration tests to ensure DB is up
+    shouldRunAfter(tasks.integrationTest)
+}
+
+tasks.check {
+    dependsOn(tasks.integrationTest, tasks.pitest, tasks.pactTest)
 }
 
 // ============================================================
