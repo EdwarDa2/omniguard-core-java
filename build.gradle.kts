@@ -238,20 +238,23 @@ tasks.register<pl.piomin.plugins.pitest.PitestTask>("pitest") {
     timestampedReports = false
     verbose = true
     threads = 4
-    // Exclude generated code and configuration classes
+    // Exclude generated code, DTOs, mappers, config, entities, and framework classes
+    // DO NOT exclude domain.vo, domain.model, domain.exception - they contain business logic
     excludedClasses = listOf(
         "com.omniguard.adapter.out.persistence.entity.*",
         "com.omniguard.adapter.in.rest.dto.*",
         "com.omniguard.adapter.in.rest.mapper.*",
         "com.omniguard.config.*",
-        "com.omniguard.domain.vo.*",
-        "com.omniguard.domain.exception.*",
-        "com.omniguard.domain.model.*"
-    )
-    // Only mutate domain and application logic
-    includedClasses = listOf(
-        "com.omniguard.domain.model.*",
-        "com.omniguard.application.service.*"
+        "com.omniguard.adapter.out.persistence.entity.*",
+        "com.omniguard.adapter.out.persistence.mapper.*",
+        "com.omniguard.adapter.out.persistence.adapter.*",
+        "com.omniguard.adapter.in.rest.controller.*",
+        "com.omniguard.adapter.in.rest.exception.*",
+        "com.omniguard.adapter.in.rest.filter.*",
+        "com.omniguard.adapter.in.rest.mapper.*",
+        "com.omniguard.adapter.in.rest.sse.*",
+        "com.omniguard.adapter.out.security.*",
+        "com.omniguard.domain.event.*"
     )
 }
 
