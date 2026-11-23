@@ -72,7 +72,7 @@ public class AssetController {
                 id,
                 request.getHostname() != null ? Hostname.of(request.getHostname()) : null,
                 request.getOsName(),
-                request.getIpAddress() != null ? request.getIpAddress() : null
+                request.getStatus()
         );
         return ResponseEntity.ok(assetRestMapper.toResponse(asset));
     }
