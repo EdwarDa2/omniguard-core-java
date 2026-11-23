@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <springProperty scope="context" name="appName" source="spring.application.name" defaultValue="omniguard-core-api"/>
+    <springProperty scope="context" name="logLevel" source="logging.level.com.omniguard" defaultValue="INFO"/>
+    <springProperty scope="context" name="jsonLogging" source="logging.json.enabled" defaultValue="true"/>
+
+    <!-- Appender Console con formato JSON -->
+    <appender name="CONSOLE_JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <customFields>{"service":"${appName}","environment":"${spring.profiles.active:dev}"}</customFields>
+            <fieldNames>
+                <timestamp>@timestamp</timestamp>
+                <level>[level]</level>
+                <logger>logger</logger>
+                <message>message</message>
+                <thread>thread</thread>
+                <class>class</class>
+                <method>method</method>
+                <line>line</line>
+            </fieldNames>
+            <includeMdcKeyName>requestId</includeMdcKeyName>
+            <includeMdcKeyName>correlationId</includeMdcKeyName>
+            <includeMdcKeyName>userId</includeMdcKeyName>
+            <includeMdcKeyName>traceId</includeMdcKeyName>
+            <includeMdcKeyName>spanId</includeMdcKeyName>
+            <includeMdcKeyName>durationMs</includeMdcKeyName>
+            <includeMdcKeyName>status</includeMdcKeyName>
+            <includeMdcKeyName>method</includeMdcKeyName>
+            <includeMdcKeyName>uri</includeMdcKeyName>
+        </encoder>
+    </appender>
+
+    <!-- Appender Console con formato texto (fallback) -->
+    <appender name="CONSOLE_TEXT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n%ex</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Appender File con rotación diaria -->
+    <appender name="FILE_JSON" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/${appName}.json</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/${appName}.%d{yyyy-MM-dd}.json.gz</fileNamePattern>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <customFields>{"service":"${appName}","environment":"${spring.profiles.active:dev}"}</customFields>
+            <fieldNames>
+                <timestamp>@timestamp</timestamp>
+                <level>[level]</level>
+                <logger>logger</logger>
+                <message>message</message>
+            </fieldNames>
+            <includeMdcKeyName>requestId</includeMdcKeyName>
+            <includeMdcKeyName>correlationId</includeMdcKeyName>
+            <includeMdcKeyName>userId</includeMdcKeyName>
+            <includeMdcKeyName>traceId</includeMdcKeyName>
+            <includeMdcKeyName>spanId</includeMdcKeyName>
+            <includeMdcKeyName>durationMs</includeMdcKeyName>
+            <includeMdcKeyName>status</includeMdcKeyName>
+            <includeMdcKeyName>method</includeMdcKeyName>
+            <includeMdcKeyName>uri</includeMdcKeyName>
+        </encoder>
+    </appender>
+
+    <!-- Logger para SQL (Hibernate) -->
+    <logger name="org.hibernate.SQL" level="DEBUG" additivity="false">
+        <appender-ref ref="CONSOLE_TEXT"/>
+    </logger>
+    <logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="TRACE" additivity="false">
+        <appender-ref ref="CONSOLE_TEXT"/>
+    </logger>
+
+    <!-- Logger para Flyway -->
+    <logger name="org.flywaydb" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE_JSON"/>
+    </logger>
+
+    <!-- Logger para Spring Security -->
+    <logger name="org.springframework.security" level="WARN" additivity="false">
+        <appender-ref ref="CONSOLE_JSON"/>
+    </logger>
+
+    <!-- Logger para Web/HTTP -->
+    <logger name="org.springframework.web" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE_JSON"/>
+    </logger>
+
+    <!-- Logger para nuestra aplicación -->
+    <logger name="com.omniguard" level="${logLevel}" additivity="false">
+        <appender-ref ref="CONSOLE_JSON"/>
+        <appender-ref ref="FILE_JSON"/>
+    </logger>
+
+    <!-- Root logger -->
+    <root level="INFO">
+        <appender-ref ref="${jsonLogging:-true} ? CONSOLE_JSON : CONSOLE_TEXT"/>
+        <appender-ref ref="FILE_JSON"/>
+    </root>
+
+</configuration>
