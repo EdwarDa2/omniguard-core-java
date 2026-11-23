@@ -19,7 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @Provider("core-api")
 @Consumer("omniguard-frontend")
 @PactFolder("build/pacts")
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class AuthControllerPactProviderTest {
