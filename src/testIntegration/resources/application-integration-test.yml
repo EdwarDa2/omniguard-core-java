@@ -1,0 +1,81 @@
+# ============================================================
+# OmniGuard Core API - Configuración para Tests de Integración
+# ============================================================
+
+spring:
+  application:
+    name: omniguard-core-api-integration-test
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/omniguard_test}
+    username: ${SPRING_DATASOURCE_USERNAME:test}
+    password: ${SPRING_DATASOURCE_PASSWORD:test}
+    hikari:
+      maximum-pool-size: 10
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+
+  main:
+    allow-bean-definition-overriding: true
+
+# ============================================================
+# Server
+# ============================================================
+server:
+  port: 0  # Puerto aleatorio para tests paralelos
+
+# ============================================================
+# Actuator
+# ============================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+
+# ============================================================
+# PASETO (claves de test)
+# ============================================================
+paseto:
+  access-token-ttl-minutes: 15
+  refresh-token-ttl-days: 30
+  local-key: "dGVzdC1rZXktdGhlLWlzLTMyLWJ5dGVzLWxvbmdlbg=="  # base64 de 32 bytes
+  private-key: "test-private-key"
+  public-key: "test-public-key"
+
+# ============================================================
+# Rate Limiting (deshabilitado para tests)
+# ============================================================
+bucket4j:
+  enabled: false
+
+# ============================================================
+# Logging
+# ============================================================
+logging:
+  level:
+    com.omniguard: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
