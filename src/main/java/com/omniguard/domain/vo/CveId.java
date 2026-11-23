@@ -21,6 +21,10 @@ public record CveId(String value) {
         return new CveId(value);
     }
 
+    public String getValue() {
+        return value;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

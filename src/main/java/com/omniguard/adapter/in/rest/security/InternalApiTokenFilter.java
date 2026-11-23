@@ -38,21 +38,18 @@ public class InternalApiTokenFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
 
         String path = request.getRequestURI();
+        String token = request.getHeader(HEADER_INTERNAL_TOKEN);
 
-        if (path.startsWith("/api/v1/internal/")) {
-            String token = request.getHeader(HEADER_INTERNAL_TOKEN);
-
-            if (token != null && !token.isBlank() && token.equals(expectedToken)) {
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(
-                                "internal-m2m",
-                                null,
-                                List.of(new SimpleGrantedAuthority("ROLE_INTERNAL"))
-                        );
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-            } else {
-                log.warn("Acceso denegado a ruta interna {}: Token ausente o inválido", path);
-            }
+        if (token != null && !token.isBlank() && token.equals(expectedToken)) {
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(
+                            "internal-m2m",
+                            null,
+                            List.of(new SimpleGrantedAuthority("ROLE_INTERNAL"), new SimpleGrantedAuthority("ROLE_ADMIN"))
+                    );
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+        } else if (path.startsWith("/api/v1/internal/")) {
+            log.warn("Acceso denegado a ruta interna {}: Token ausente o inválido", path);
         }
 
         filterChain.doFilter(request, response);

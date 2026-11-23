@@ -18,6 +18,7 @@ public class NetworkAssetJpaEntity {
     private Long id;
 
     @Column(name = "ip_address", nullable = false, unique = true)
+    @org.hibernate.annotations.ColumnTransformer(read = "host(ip_address)", write = "?::inet")
     private String ipAddress;
 
     @Column(length = 255)

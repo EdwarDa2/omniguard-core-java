@@ -104,23 +104,26 @@ public class PasetoAuthenticationFilter extends OncePerRequestFilter {
     // Helpers para controladores (setear cookies)
     // ============================================================
     public static void setAuthCookies(HttpServletResponse response, String accessToken, String refreshToken) {
-        // Access token: 15 min, path /, HttpOnly, Secure, SameSite=Strict
+        boolean isProduction = "production".equalsIgnoreCase(System.getenv("SPRING_PROFILES_ACTIVE"));
+        // Access token: 15 min, path /, HttpOnly, SameSite=Lax
         Cookie atCookie = new Cookie(ACCESS_TOKEN_COOKIE, accessToken);
         atCookie.setHttpOnly(true);
-        atCookie.setSecure(true);
+        atCookie.setSecure(isProduction);
         atCookie.setPath("/");
         atCookie.setMaxAge(15 * 60); // 15 minutos
-        atCookie.setAttribute("SameSite", "Strict");
+        atCookie.setAttribute("SameSite", "Lax");
         response.addCookie(atCookie);
 
-        // Refresh token: 30 días, path /api/v1/auth/refresh, HttpOnly, Secure, SameSite=Strict
+        // Refresh token: 30 días, path /api/v1/auth/refresh, HttpOnly, SameSite=Lax
         Cookie rtCookie = new Cookie(REFRESH_TOKEN_COOKIE, refreshToken);
         rtCookie.setHttpOnly(true);
-        rtCookie.setSecure(true);
+        rtCookie.setSecure(isProduction);
         rtCookie.setPath("/api/v1/auth/refresh");
         rtCookie.setMaxAge(30 * 24 * 60 * 60); // 30 días
-        rtCookie.setAttribute("SameSite", "Strict");
+        rtCookie.setAttribute("SameSite", "Lax");
         response.addCookie(rtCookie);
+
+        response.setHeader("Authorization", "Bearer " + accessToken);
     }
 
     public static void clearAuthCookies(HttpServletResponse response) {

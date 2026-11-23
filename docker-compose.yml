@@ -1,0 +1,27 @@
+services:
+  core-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: omniguard-core-api:latest
+    container_name: omniguard-core
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_JPA_HIBERNATE_DDL_AUTO: none
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/omniguard
+      SPRING_DATASOURCE_USERNAME: omniguard
+      SPRING_DATASOURCE_PASSWORD: omniguard_dev_edwarda2
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-omniguard_m2m_secret_token_dev_2026}
+    networks:
+      - omniguard-network
+
+networks:
+  omniguard-network:
+    name: omniguard-infra_omniguard
+    external: true

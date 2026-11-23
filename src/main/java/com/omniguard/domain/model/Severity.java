@@ -6,5 +6,16 @@ public enum Severity {
     MEDIUM,
     LOW,
     NONE,
-    INFO
+    INFO;
+
+    public static Severity fromString(String value) {
+        if (value == null || value.isBlank()) {
+            return INFO;
+        }
+        try {
+            return Severity.valueOf(value.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return INFO;
+        }
+    }
 }

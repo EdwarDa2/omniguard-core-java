@@ -272,8 +272,13 @@ public class PasetoTokenService {
     }
 
     private String hashToken(String token) {
-        // Argon2id hash del token para almacenar en BD
-        return "argon2id$" + Base64.getEncoder().encodeToString(token.getBytes(StandardCharsets.UTF_8));
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
+            return "sha256$" + Base64.getEncoder().encodeToString(hash);
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
     }
 
     // ============================================================

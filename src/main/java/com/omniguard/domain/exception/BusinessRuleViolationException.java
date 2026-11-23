@@ -8,6 +8,11 @@ public class BusinessRuleViolationException extends RuntimeException {
         this.ruleCode = ruleCode;
     }
 
+    public BusinessRuleViolationException(String message) {
+        super(message);
+        this.ruleCode = "BUSINESS_RULE_VIOLATION";
+    }
+
     public String getRuleCode() {
         return ruleCode;
     }

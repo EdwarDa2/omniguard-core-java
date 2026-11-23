@@ -30,9 +30,11 @@ public class AlertJpaEntity {
     private String description;
 
     @Column(name = "source_ip", nullable = false)
+    @org.hibernate.annotations.ColumnTransformer(read = "host(source_ip)", write = "?::inet")
     private String sourceIp;
 
     @Column(name = "destination_ip", nullable = false)
+    @org.hibernate.annotations.ColumnTransformer(read = "host(destination_ip)", write = "?::inet")
     private String destinationIp;
 
     @Column(name = "destination_port")
@@ -44,7 +46,8 @@ public class AlertJpaEntity {
     @Column(name = "app_protocol", length = 100)
     private String appProtocol;
 
-    @Column(name = "raw_event", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "raw_event", nullable = false, columnDefinition = "jsonb")
+    @org.hibernate.annotations.ColumnTransformer(read = "raw_event::text", write = "?::jsonb")
     private String rawEvent;
 
     @Column(name = "detected_at", nullable = false)

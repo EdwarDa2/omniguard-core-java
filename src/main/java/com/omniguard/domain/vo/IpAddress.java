@@ -10,11 +10,13 @@ public record IpAddress(String value) {
             throw new IllegalArgumentException("IP address no puede ser nula o vacía");
         }
         String trimmed = value.trim();
+        String ipOnly = trimmed.contains("/") ? trimmed.substring(0, trimmed.indexOf('/')) : trimmed;
         try {
-            InetAddress.getByName(trimmed);
+            InetAddress.getByName(ipOnly);
         } catch (UnknownHostException e) {
             throw new IllegalArgumentException("IP address inválida: " + value);
         }
+        value = ipOnly;
     }
 
     public static IpAddress of(String value) {
@@ -31,6 +33,10 @@ public record IpAddress(String value) {
         } catch (UnknownHostException e) {
             throw new IllegalStateException("IP address inválida almacenada: " + value, e);
         }
+    }
+
+    public String getValue() {
+        return value;
     }
 
     @Override

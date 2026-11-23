@@ -18,8 +18,8 @@ RUN gradle dependencies --no-daemon
 # Copiar código fuente
 COPY src ./src
 
-# Compilar y testear (sin tests de integración que requieren BD)
-RUN gradle build -x test -x integrationTest --no-daemon
+# Compilar y empaquetar JAR ejecutable Spring Boot
+RUN gradle bootJar --no-daemon
 
 # ---- STAGE 2: Runtime ----
 FROM eclipse-temurin:21-jre-alpine

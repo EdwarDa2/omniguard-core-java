@@ -34,6 +34,7 @@ public class PasetoSessionJpaEntity {
     private String revokeReason;
 
     @Column(name = "ip_address")
+    @org.hibernate.annotations.ColumnTransformer(read = "host(ip_address)", write = "?::inet")
     private String ipAddress;
 
     @Column(name = "user_agent", columnDefinition = "TEXT")
