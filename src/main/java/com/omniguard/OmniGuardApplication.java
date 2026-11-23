@@ -10,7 +10,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication(scanBasePackages = "com.omniguard")
 @EntityScan(basePackages = "com.omniguard.adapter.out.persistence.entity")
-@EnableJpaAuditing(auditorAwareRef = "auditorAware")
+@EnableJpaAuditing
 @EnableAsync
 @EnableScheduling
 @EnableAspectJAutoProxy(proxyTargetClass = true)
