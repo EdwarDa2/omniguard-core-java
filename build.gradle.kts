@@ -20,6 +20,7 @@ version = "1.0.0-SNAPSHOT"
 repositories {
     mavenCentral()
     maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots/") }
+    maven { url = uri("https://jitpack.io") }  // Para com.github.paseto:paseto-java
 }
 
 configurations {

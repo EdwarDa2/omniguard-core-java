@@ -1,7 +1,9 @@
 package com.omniguard.application.service;
 
+import com.omniguard.adapter.in.rest.sse.SseAlertService;
 import com.omniguard.domain.event.AlertCreatedEvent;
 import com.omniguard.domain.model.Alert;
+import com.omniguard.domain.model.AlertStats;
 import com.omniguard.domain.port.in.AlertUseCase;
 import com.omniguard.domain.port.out.AlertRepository;
 import org.springframework.context.ApplicationEventPublisher;
@@ -12,7 +14,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -22,10 +23,12 @@ public class AlertService implements AlertUseCase {
 
     private final AlertRepository alertRepository;
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
+    private final SseAlertService sseAlertService;
 
-    public AlertService(AlertRepository alertRepository, ApplicationEventPublisher eventPublisher) {
+    public AlertService(AlertRepository alertRepository, ApplicationEventPublisher eventPublisher, SseAlertService sseAlertService) {
         this.alertRepository = alertRepository;
         this.eventPublisher = eventPublisher;
+        this.sseAlertService = sseAlertService;
     }
 
     @Override
@@ -43,7 +46,6 @@ public class AlertService implements AlertUseCase {
 
     @Override
     public List<Alert> findAll(AlertFilter filter, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         // La implementación real delega en el adapter
         throw new UnsupportedOperationException("Usar AlertRepositoryAdapter directamente para queries complejas");
     }
@@ -78,12 +80,21 @@ public class AlertService implements AlertUseCase {
         return new AlertStream() {
             @Override
             public void subscribe(UUID userId, AlertStreamHandler handler) {
-                // Implementado en SseAlertService
+                SseEmitter emitter = sseAlertService.subscribe(userId.toString());
+                // Wrapper para adaptar AlertStreamHandler a SseEmitter
+                try {
+                    // Enviar evento inicial de conexión
+                    emitter.send(org.springframework.web.servlet.mvc.method.annotation.SseEmitter.event()
+                            .name("connected")
+                            .data("Conectado a stream de alertas"));
+                } catch (Exception e) {
+                    emitter.completeWithError(e);
+                }
             }
 
             @Override
             public void unsubscribe(UUID userId) {
-                // Implementado en SseAlertService
+                sseAlertService.unsubscribe(userId.toString());
             }
         };
     }

@@ -3,6 +3,7 @@ package com.omniguard.adapter.in.rest.controller;
 import com.omniguard.adapter.in.rest.dto.alert.*;
 import com.omniguard.adapter.in.rest.dto.common.PageResponse;
 import com.omniguard.adapter.in.rest.mapper.AlertRestMapper;
+import com.omniguard.adapter.in.rest.sse.SseAlertService;
 import com.omniguard.domain.model.Alert;
 import com.omniguard.domain.model.AlertStats;
 import com.omniguard.domain.port.in.AlertUseCase;
@@ -21,14 +22,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-
-import java.io.IOException;
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 @RestController
 @RequestMapping("/api/v1/alerts")
@@ -38,7 +31,7 @@ public class AlertController {
 
     private final AlertUseCase alertUseCase;
     private final AlertRestMapper alertRestMapper;
-    private final ExecutorService sseExecutor = Executors.newCachedThreadPool();
+    private final SseAlertService sseAlertService;
 
     @GetMapping
     public ResponseEntity<PageResponse<AlertResponse>> findAll(
@@ -114,25 +107,9 @@ public class AlertController {
         response.setHeader("Connection", "keep-alive");
         response.setHeader("X-Accel-Buffering", "no");
 
-        SseEmitter emitter = new SseEmitter(-1L); // Sin timeout
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String userId = auth.getName();
 
-        sseExecutor.execute(() -> {
-            try {
-                alertUseCase.AlertStream stream = alertUseCase.AlertStream();
-                // Simplificado: en implementación real, usar un servicio de eventos
-                // que notifique cuando haya nuevas alertas
-                while (true) {
-                    Thread.sleep(30000); // Heartbeat cada 30s
-                    emitter.send(SseEmitter.event().name("heartbeat").data("ping"));
-                }
-            } catch (IOException | InterruptedException e) {
-                emitter.completeWithError(e);
-            }
-        });
-
-        emitter.onCompletion(() -> sseExecutor.submit(() -> {}));
-        emitter.onTimeout(() -> sseExecutor.submit(() -> {}));
-
-        return emitter;
+        return sseAlertService.subscribe(userId);
     }
 }

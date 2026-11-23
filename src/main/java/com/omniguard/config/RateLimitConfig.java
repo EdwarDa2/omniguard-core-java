@@ -17,9 +17,11 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Configuration
+@org.springframework.boot.context.properties.EnableConfigurationProperties(RateLimitProperties.class)
 public class RateLimitConfig {
 
     private final Map<String, Bucket> localBuckets = new ConcurrentHashMap<>();
+    private final RateLimitProperties properties;
 
     @Value("${spring.data.redis.host:localhost}")
     private String redisHost;
@@ -32,6 +34,10 @@ public class RateLimitConfig {
 
     @Value("${bucket4j.enabled:true}")
     private boolean enabled;
+
+    public RateLimitConfig(RateLimitProperties properties) {
+        this.properties = properties;
+    }
 
     @Bean
     public ProxyManager<String> bucket4jProxyManager() {
@@ -51,23 +57,14 @@ public class RateLimitConfig {
 
     @Bean
     public RateLimitService rateLimitService(ProxyManager<String> proxyManager) {
-        return new RateLimitService(proxyManager, enabled);
+        return new RateLimitService(proxyManager, enabled, properties);
     }
 
-    // Configuración de buckets por tipo de endpoint
-    public record RateLimitRule(
-            String key,
-            int capacity,
-            long refillTokens,
-            Duration refillPeriod,
-            boolean distributed
-    ) {}
+    public Map<String, RateLimitProperties.RateLimitRule> getRules() {
+        return properties.getRules();
+    }
 
-    public static final Map<String, RateLimitRule> RULES = Map.of(
-            "auth:login", new RateLimitRule("auth:login", 5, 5, java.time.Duration.ofMinutes(1), true),
-            "auth:register", new RateLimitRule("auth:register", 3, 3, java.time.Duration.ofMinutes(1), true),
-            "auth:refresh", new RateLimitRule("auth:refresh", 10, 10, java.time.Duration.ofMinutes(1), true),
-            "api:default", new RateLimitRule("api:default", 100, 100, java.time.Duration.ofMinutes(1), true),
-            "sse:stream", new RateLimitRule("sse:stream", 10, 10, java.time.Duration.ofMinutes(1), true)
-    );
+    public boolean isEnabled() {
+        return enabled;
+    }
 }

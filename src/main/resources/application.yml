@@ -201,6 +201,35 @@ bucket4j:
       rate-limit: 10
       duration-minutes: 1
 
+# Reglas configurables via @ConfigurationProperties (bucket4j.rules)
+bucket4j:
+  rules:
+    auth:login:
+      capacity: 5
+      refill-tokens: 5
+      refill-period: 1m
+      distributed: true
+    auth:register:
+      capacity: 3
+      refill-tokens: 3
+      refill-period: 1m
+      distributed: true
+    auth:refresh:
+      capacity: 10
+      refill-tokens: 10
+      refill-period: 1m
+      distributed: true
+    api:default:
+      capacity: 100
+      refill-tokens: 100
+      refill-period: 1m
+      distributed: true
+    sse:stream:
+      capacity: 10
+      refill-tokens: 10
+      refill-period: 1m
+      distributed: true
+
 # ============================================================
 # App Custom Properties
 # ============================================================
