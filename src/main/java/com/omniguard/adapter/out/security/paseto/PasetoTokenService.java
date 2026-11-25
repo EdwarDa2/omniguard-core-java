@@ -112,15 +112,25 @@ public class PasetoTokenService {
     @PostConstruct
     public void init() {
         if (localKey == null) {
-            throw new IllegalStateException("PASETO_LOCAL_KEY debe configurarse con 32 bytes codificados en Base64");
-        }
-        if (localKey.length != 32) {
-            throw new IllegalStateException("PASETO_LOCAL_KEY debe contener exactamente 32 bytes");
+            log.warn("PASETO_LOCAL_KEY no configurada. Generando clave simétrica de 32 bytes para desarrollo...");
+            this.localKey = new byte[32];
+            new java.security.SecureRandom().nextBytes(this.localKey);
+        } else if (localKey.length != 32) {
+            log.warn("PASETO_LOCAL_KEY tiene {} bytes. Ajustando automáticamente a exactamente 32 bytes.", localKey.length);
+            this.localKey = java.util.Arrays.copyOf(localKey, 32);
         }
         if (privateKey == null || publicKey == null) {
-            throw new IllegalStateException(
-                    "PASETO_PUBLIC_KEY y PASETO_PRIVATE_KEY deben configurarse"
-            );
+            try {
+                log.warn("PASETO_PUBLIC_KEY o PASETO_PRIVATE_KEY no configuradas en el entorno. Generando par de claves Ed25519 efímero para desarrollo...");
+                java.security.KeyPairGenerator keyPairGenerator = java.security.KeyPairGenerator.getInstance("Ed25519");
+                java.security.KeyPair keyPair = keyPairGenerator.generateKeyPair();
+                this.privateKey = new PrivateKey(keyPair.getPrivate(), Version.V4);
+                this.publicKey = new PublicKey(keyPair.getPublic(), Version.V4);
+                log.info("Par de claves Ed25519 autogenerado exitosamente para la sesión.");
+            } catch (Exception e) {
+                log.error("Error al generar par de claves Ed25519: {}", e.getMessage());
+                throw new IllegalStateException("PASETO_PUBLIC_KEY y PASETO_PRIVATE_KEY deben configurarse", e);
+            }
         }
     }
 

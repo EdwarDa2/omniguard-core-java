@@ -1,5 +1,7 @@
 package com.omniguard.adapter.in.rest.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.omniguard.adapter.in.rest.dto.response.DashboardStatsResponseDto;
 import com.omniguard.adapter.out.persistence.entity.AlertJpaEntity;
 import com.omniguard.adapter.out.persistence.repository.SpringDataAlertRepository;
@@ -13,8 +15,11 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,21 +30,29 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Dashboard SOC", description = "Endpoints de resumen ejecutivo y métricas consolidadas para el Blue Team")
 public class DashboardController {
 
+    private static final Logger log = LoggerFactory.getLogger(DashboardController.class);
+
     private static final DateTimeFormatter TIME_FORMATTER =
             DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.of("UTC"));
 
     private final SpringDataAlertRepository alertRepository;
     private final SpringDataServiceRepository serviceRepository;
     private final SpringDataCveRecordRepository cveRecordRepository;
+    private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
 
     public DashboardController(
             SpringDataAlertRepository alertRepository,
             SpringDataServiceRepository serviceRepository,
-            SpringDataCveRecordRepository cveRecordRepository
+            SpringDataCveRecordRepository cveRecordRepository,
+            StringRedisTemplate redisTemplate,
+            ObjectMapper objectMapper
     ) {
         this.alertRepository = alertRepository;
         this.serviceRepository = serviceRepository;
         this.cveRecordRepository = cveRecordRepository;
+        this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
     }
 
     @GetMapping("/stats")
@@ -74,24 +87,50 @@ public class DashboardController {
                 ))
                 .toList();
 
-        // 3. Actividad de tráfico sintética basada en eventos de red actuales
-        List<DashboardStatsResponseDto.TimeSeriesPointDto> timeSeries = new ArrayList<>();
-        Instant now = Instant.now();
-        DateTimeFormatter hourMinFormat = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.of("UTC"));
-        for (int i = 5; i >= 0; i--) {
-            Instant t = now.minus(i * 15L, ChronoUnit.MINUTES);
-            timeSeries.add(new DashboardStatsResponseDto.TimeSeriesPointDto(
-                    hourMinFormat.format(t),
-                    100 + (long) (Math.random() * 400),
-                    50 + (long) (Math.random() * 200)
-            ));
+        // 3. Actividad de tráfico en tiempo real (consultada desde Redis metrics:traffic:latest)
+        long currentPacketsPerSec = 0L;
+        double bandwidthMbps = 0.0;
+        String sensorStatus = "INACTIVE";
+
+        try {
+            String trafficJson = redisTemplate.opsForValue().get("metrics:traffic:latest");
+            if (trafficJson != null && !trafficJson.isBlank()) {
+                JsonNode node = objectMapper.readTree(trafficJson);
+                currentPacketsPerSec = node.path("packets_per_sec").asLong(0L);
+                bandwidthMbps = node.path("bandwidth_mbps").asDouble(0.0);
+                sensorStatus = node.path("sensor_status").asText("ACTIVE");
+            }
+        } catch (Exception e) {
+            log.warn("Error leyendo telemetría en tiempo real desde Redis: {}", e.getMessage());
+        }
+
+        // 4. Serie temporal verídica: devolver datos únicamente cuando exista una fuente histórica real en Redis; mientras tanto, lista vacía
+        List<DashboardStatsResponseDto.TimeSeriesPointDto> timeSeries = java.util.Collections.emptyList();
+        try {
+            String historyJson = redisTemplate.opsForValue().get("metrics:traffic:history");
+            if (historyJson != null && !historyJson.isBlank()) {
+                JsonNode historyNode = objectMapper.readTree(historyJson);
+                if (historyNode.isArray() && !historyNode.isEmpty()) {
+                    List<DashboardStatsResponseDto.TimeSeriesPointDto> points = new ArrayList<>();
+                    for (JsonNode item : historyNode) {
+                        points.add(new DashboardStatsResponseDto.TimeSeriesPointDto(
+                                item.path("time").asText(""),
+                                item.path("inbound").asLong(0L),
+                                item.path("outbound").asLong(0L)
+                        ));
+                    }
+                    timeSeries = points;
+                }
+            }
+        } catch (Exception e) {
+            log.debug("No hay serie temporal histórica disponible en Redis: {}", e.getMessage());
         }
 
         DashboardStatsResponseDto.TrafficActivityDto trafficActivity =
                 new DashboardStatsResponseDto.TrafficActivityDto(
-                        4520L,
-                        38.4,
-                        "ACTIVE",
+                        currentPacketsPerSec,
+                        bandwidthMbps,
+                        sensorStatus,
                         timeSeries
                 );
 

@@ -48,18 +48,13 @@ RUN chown -R omniguard:omniguard /app
 USER omniguard
 
 # JVM Optimizada para contenedores
-ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 \
-    -XX:+UseContainerSupport \
-    -XX:+UseG1GC \
-    -XX:MaxGCPauseMillis=100 \
-    -Djava.security.egd=file:/dev/./urandom \
-    -Dspring.profiles.active=docker"
+ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -XX:+UseContainerSupport -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -Djava.security.egd=file:/dev/./urandom -Dspring.profiles.active=docker"
 
 # Puertos
 EXPOSE 8080 8081
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+# Healthcheck (start-period ampliado a 60s para JVM en Windows)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8081/actuator/health/liveness || exit 1
 
 # Entry point

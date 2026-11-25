@@ -129,6 +129,32 @@ public class AlertSseService {
         }
     }
 
+    public void broadcastScanCompleted(String scanId, Long assetId, String targetIp, int openPortsCount, String scannedAt) {
+        if (emitters.isEmpty()) {
+            return;
+        }
+
+        Map<String, Object> payload = Map.of(
+                "scanId", scanId != null ? scanId : "",
+                "assetId", assetId != null ? assetId : 0L,
+                "targetIp", targetIp != null ? targetIp : "",
+                "status", "COMPLETED",
+                "openPortsCount", openPortsCount,
+                "scannedAt", scannedAt != null ? scannedAt : Instant.now().toString()
+        );
+
+        log.info("Broadcasting scan:completed event via SSE for scanId={}, assetId={}, ip={} ({} open ports) to {} clients",
+                scanId, assetId, targetIp, openPortsCount, emitters.size());
+
+        for (SseEmitter emitter : emitters) {
+            try {
+                emitter.send(SseEmitter.event().name("scan:completed").data(payload));
+            } catch (Exception e) {
+                emitters.remove(emitter);
+            }
+        }
+    }
+
     public int getActiveClientsCount() {
         return emitters.size();
     }

@@ -114,6 +114,13 @@ public class AssetPersistenceAdapter implements AssetRepository {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Optional<OpenPort> findPort(Long assetId, int port, String protocol) {
+        return serviceRepository.findByAssetIdAndPortAndProtocol(assetId, port, protocol)
+                .map(mapper::toDomain);
+    }
+
+    @Override
     @Transactional
     public OpenPort savePort(OpenPort port) {
         ServiceJpaEntity entity = mapper.toJpaEntity(port);

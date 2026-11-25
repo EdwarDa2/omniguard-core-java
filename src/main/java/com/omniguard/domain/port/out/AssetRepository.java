@@ -28,5 +28,7 @@ public interface AssetRepository {
 
     List<Vulnerability> findVulnerabilitiesByAssetId(Long assetId);
 
+    Optional<OpenPort> findPort(Long assetId, int port, String protocol);
+
     OpenPort savePort(OpenPort port);
 }

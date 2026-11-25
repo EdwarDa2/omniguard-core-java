@@ -17,6 +17,8 @@ public interface SpringDataAlertRepository extends JpaRepository<AlertJpaEntity,
 
     long countByDetectedAtAfter(Instant after);
 
+    long countByDetectedAtBetween(Instant start, Instant end);
+
     @Query("SELECT COUNT(a) FROM AlertJpaEntity a WHERE a.status = 'ACTIVE' OR a.status = 'OPEN'")
     long countActive();
 

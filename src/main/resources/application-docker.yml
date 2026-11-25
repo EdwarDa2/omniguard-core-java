@@ -1,0 +1,19 @@
+# ============================================================
+# OmniGuard Core API - Configuración para Perfil Docker
+# ============================================================
+
+spring:
+  config:
+    activate:
+      on-profile: docker
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/omniguard}
+    username: ${SPRING_DATASOURCE_USERNAME:omniguard}
+    password: ${SPRING_DATASOURCE_PASSWORD:omniguard_dev_edwarda2}
+
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:redis}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      password: ${SPRING_DATA_REDIS_PASSWORD:}

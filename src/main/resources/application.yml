@@ -216,6 +216,10 @@ internal:
   api:
     token: ${INTERNAL_API_TOKEN:}
 
+scan:
+  authorized-targets: ${SCAN_AUTHORIZED_TARGETS:127.0.0.1,localhost,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
+  max-ports: ${SCAN_MAX_PORTS:1024}
+
 admin:
   initial:
     username: ${ADMIN_INITIAL_USERNAME:admin}

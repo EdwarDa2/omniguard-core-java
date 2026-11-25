@@ -94,7 +94,7 @@ public class AssetController {
     }
 
     @PostMapping("/{id}/scan")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('ROLE_ANALYST')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('ROLE_ANALYST') or hasAuthority('ROLE_INTERNAL')")
     public ResponseEntity<ScanResponseDto> triggerScan(
             @PathVariable Long id,
             @RequestBody(required = false) TriggerScanRequestDto request
@@ -103,10 +103,10 @@ public class AssetController {
                 () -> new EntityNotFoundException("Asset not found with id: " + id)
         );
         String ports = request != null && request.ports() != null ? request.ports() : "1-1024";
-        assetUseCase.triggerScan(id, ports);
+        UUID scanId = assetUseCase.triggerScan(id, ports);
 
         ScanResponseDto response = new ScanResponseDto(
-                UUID.randomUUID().toString(),
+                scanId.toString(),
                 asset.ipAddress().getValue(),
                 "QUEUED",
                 "Orden de escaneo publicada al microservicio sensor C++"
@@ -120,13 +120,14 @@ public class AssetController {
             @RequestBody(required = false) TriggerScanRequestDto request
     ) {
         String ports = request != null && request.ports() != null ? request.ports() : "1-1024";
-        assetUseCase.triggerScanAll(ports);
+        List<UUID> scanIds = assetUseCase.triggerScanAll(ports);
 
+        String firstScanId = !scanIds.isEmpty() ? scanIds.get(0).toString() : UUID.randomUUID().toString();
         ScanResponseDto response = new ScanResponseDto(
-                UUID.randomUUID().toString(),
-                "ALL",
+                firstScanId,
+                "ALL (" + scanIds.size() + " activos autorizados)",
                 "QUEUED",
-                "Escaneo de superficie iniciado en la red perimetral"
+                "Escaneo de superficie iniciado para " + scanIds.size() + " activos autorizados"
         );
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
     }

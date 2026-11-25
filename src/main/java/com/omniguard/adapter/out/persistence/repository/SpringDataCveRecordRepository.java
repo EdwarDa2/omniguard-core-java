@@ -26,4 +26,34 @@ public interface SpringDataCveRecordRepository extends JpaRepository<CveRecordJp
             nativeQuery = true
     )
     long countVulnerableAssets();
+
+    @Query(
+            value = """
+            SELECT DISTINCT m.cve_id FROM nvd.cpe_matches m
+            WHERE m.cpe_name = :cpeName OR m.cpe_name LIKE CONCAT(:cpePrefix, '%')
+            LIMIT :maxResults
+            """,
+            nativeQuery = true
+    )
+    List<String> findCveIdsByCpe(@Param("cpeName") String cpeName, @Param("cpePrefix") String cpePrefix, @Param("maxResults") int maxResults);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.transaction.annotation.Transactional
+    @Query(
+            value = """
+            INSERT INTO nvd.asset_cve_matches (asset_id, service_id, cve_id, cpe_name, matched_at)
+            SELECT :assetId, :serviceId, :cveId, :cpeName, CURRENT_TIMESTAMP
+            WHERE NOT EXISTS (
+                SELECT 1 FROM nvd.asset_cve_matches
+                WHERE service_id = :serviceId AND cve_id = :cveId
+            )
+            """,
+            nativeQuery = true
+    )
+    void insertMatch(
+            @Param("assetId") Long assetId,
+            @Param("serviceId") Long serviceId,
+            @Param("cveId") String cveId,
+            @Param("cpeName") String cpeName
+    );
 }

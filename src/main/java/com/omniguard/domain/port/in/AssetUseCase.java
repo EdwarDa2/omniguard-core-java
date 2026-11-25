@@ -6,6 +6,7 @@ import com.omniguard.domain.model.Vulnerability;
 import com.omniguard.domain.vo.IpAddress;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 public interface AssetUseCase {
     Asset create(IpAddress ipAddress, String hostname);
@@ -30,13 +31,15 @@ public interface AssetUseCase {
 
     void delete(Long id);
 
-    void triggerScan(Long assetId);
+    UUID triggerScan(Long assetId, String ports);
 
-    default void triggerScan(Long assetId, String ports) {
-        triggerScan(assetId);
+    default UUID triggerScan(Long assetId) {
+        return triggerScan(assetId, "1-1024");
     }
 
-    void triggerScanAll(String ports);
+    List<UUID> triggerScanAll(String ports);
+
+    Asset processScanResults(IpAddress targetIp, List<OpenPort> discoveredPorts);
 
     List<OpenPort> getPorts(Long assetId);
 

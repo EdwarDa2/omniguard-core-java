@@ -52,6 +52,21 @@ public record Asset(
         );
     }
 
+    public Asset withLastSeenAt(Instant lastSeenAt) {
+        return new Asset(
+                this.id,
+                this.ipAddress,
+                this.hostname,
+                this.description,
+                this.os,
+                this.status,
+                this.firstSeenAt,
+                lastSeenAt,
+                this.openPorts,
+                this.vulnerabilities
+        );
+    }
+
     public Asset withPortsAndVulnerabilities(List<OpenPort> ports, List<Vulnerability> vulns) {
         return new Asset(
                 this.id,

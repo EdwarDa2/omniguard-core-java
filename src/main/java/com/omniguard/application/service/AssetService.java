@@ -24,10 +24,19 @@ public class AssetService implements AssetUseCase {
 
     private final AssetRepository assetRepository;
     private final ScanCommandPublisher scanCommandPublisher;
+    private final VulnerabilityCorrelationService vulnerabilityCorrelationService;
+    private final ScanTargetValidator scanTargetValidator;
 
-    public AssetService(AssetRepository assetRepository, ScanCommandPublisher scanCommandPublisher) {
+    public AssetService(
+            AssetRepository assetRepository,
+            ScanCommandPublisher scanCommandPublisher,
+            VulnerabilityCorrelationService vulnerabilityCorrelationService,
+            ScanTargetValidator scanTargetValidator
+    ) {
         this.assetRepository = assetRepository;
         this.scanCommandPublisher = scanCommandPublisher;
+        this.vulnerabilityCorrelationService = vulnerabilityCorrelationService;
+        this.scanTargetValidator = scanTargetValidator;
     }
 
     @Override
@@ -103,28 +112,118 @@ public class AssetService implements AssetUseCase {
     }
 
     @Override
-    public void triggerScan(Long assetId) {
-        triggerScan(assetId, "1-1024");
+    public UUID triggerScan(Long assetId) {
+        return triggerScan(assetId, "1-1024");
     }
 
     @Override
-    public void triggerScan(Long assetId, String ports) {
+    public UUID triggerScan(Long assetId, String ports) {
         Asset asset = assetRepository.findById(assetId).orElseThrow(
                 () -> new EntityNotFoundException("Asset not found with id: " + assetId)
         );
+
+        String normalizedPorts = ports != null && !ports.isBlank() ? ports : "1-1024";
+        scanTargetValidator.validatePorts(normalizedPorts);
+        scanTargetValidator.validateTarget(asset.ipAddress().getValue());
+
         UUID scanId = UUID.randomUUID();
-        scanCommandPublisher.publishScanCommand(scanId, asset.ipAddress(), ports);
-        log.info("Triggered active SurfaceScan for asset: id={}, ip={}, scanId={}", assetId, asset.ipAddress().getValue(), scanId);
+        scanCommandPublisher.publishScanCommand(scanId, asset.ipAddress(), normalizedPorts);
+        log.info("Triggered active SurfaceScan for asset: id={}, ip={}, scanId={}, ports={}",
+                assetId, asset.ipAddress().getValue(), scanId, normalizedPorts);
+        return scanId;
     }
 
     @Override
-    public void triggerScanAll(String ports) {
+    public List<UUID> triggerScanAll(String ports) {
+        String normalizedPorts = ports != null && !ports.isBlank() ? ports : "1-1024";
+        scanTargetValidator.validatePorts(normalizedPorts);
+
         List<Asset> activeAssets = assetRepository.findByStatus("active", 0, 100);
-        log.info("Triggering perimetric SurfaceScan for {} active assets", activeAssets.size());
+        List<UUID> scanIds = new java.util.ArrayList<>();
+        int skipped = 0;
+
         for (Asset asset : activeAssets) {
-            UUID scanId = UUID.randomUUID();
-            scanCommandPublisher.publishScanCommand(scanId, asset.ipAddress(), ports);
+            if (scanTargetValidator.isTargetAuthorized(asset.ipAddress().getValue())) {
+                UUID scanId = UUID.randomUUID();
+                scanCommandPublisher.publishScanCommand(scanId, asset.ipAddress(), normalizedPorts);
+                scanIds.add(scanId);
+            } else {
+                skipped++;
+                log.warn("Omitiendo escaneo de activo id={}, ip={}: Fuera de la allowlist autorizada",
+                        asset.id(), asset.ipAddress().getValue());
+            }
         }
+
+        log.info("Triggered perimetric SurfaceScan for {} authorized assets ({} skipped)",
+                scanIds.size(), skipped);
+        return scanIds;
+    }
+
+    @Override
+    @Transactional
+    public Asset processScanResults(IpAddress targetIp, List<OpenPort> discoveredPorts) {
+        Asset asset = assetRepository.findByIpAddress(targetIp)
+                .orElseGet(() -> assetRepository.save(
+                        Asset.create(targetIp, "host-" + targetIp.getValue().replace(".", "-"),
+                                "Activo detectado por escaneo perimetral", "Linux / Desconocido")
+                ));
+
+        asset = assetRepository.save(asset.withLastSeenAt(java.time.Instant.now()));
+
+        if (discoveredPorts != null) {
+            for (OpenPort p : discoveredPorts) {
+                String protocol = (p.protocol() != null && !p.protocol().isBlank())
+                        ? p.protocol().toUpperCase()
+                        : "TCP";
+
+                Optional<OpenPort> existingPortOpt = assetRepository.findPort(asset.id(), p.port(), protocol);
+                OpenPort savedPort;
+                if (existingPortOpt.isPresent()) {
+                    OpenPort existing = existingPortOpt.get();
+                    OpenPort updated = new OpenPort(
+                            existing.id(),
+                            asset.id(),
+                            existing.port(),
+                            existing.protocol(),
+                            (p.appProtocol() != null && !p.appProtocol().isBlank() && !"Desconocido".equalsIgnoreCase(p.appProtocol()))
+                                    ? p.appProtocol()
+                                    : existing.appProtocol(),
+                            p.banner() != null ? p.banner() : existing.banner(),
+                            p.productVersion() != null ? p.productVersion() : existing.productVersion(),
+                            existing.cpeName(),
+                            existing.firstSeenAt(),
+                            java.time.Instant.now()
+                    );
+                    savedPort = assetRepository.savePort(updated);
+                } else {
+                    OpenPort newPort = OpenPort.create(
+                            asset.id(),
+                            p.port(),
+                            protocol,
+                            p.appProtocol(),
+                            p.banner(),
+                            p.productVersion(),
+                            null
+                    );
+                    savedPort = assetRepository.savePort(newPort);
+                }
+
+                if (savedPort != null && savedPort.id() != null) {
+                    vulnerabilityCorrelationService.correlateService(
+                            asset.id(),
+                            savedPort.id(),
+                            savedPort.productVersion(),
+                            savedPort.appProtocol(),
+                            savedPort.banner()
+                    );
+                }
+            }
+        }
+
+        log.info("Processed {} scan results for asset id={}, ip={}",
+                discoveredPorts != null ? discoveredPorts.size() : 0, asset.id(), targetIp.getValue());
+
+        return assetRepository.findById(asset.id()).orElse(asset);
     }
 
     @Override
