@@ -1,5 +1,6 @@
 package com.omniguard.adapter.in.rest.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -16,10 +17,12 @@ public record DiscoveredPortDto(
         @Size(max = 10, message = "El protocolo no puede superar 10 caracteres")
         String protocol,
 
+        @JsonAlias({"appProtocol", "app_protocol"})
         @JsonProperty("app_protocol")
         @Size(max = 100, message = "El protocolo de aplicación no puede superar 100 caracteres")
         String appProtocol,
 
+        @JsonAlias({"productVersion", "product_version"})
         @JsonProperty("product_version")
         @Size(max = 100, message = "La versión del producto no puede superar 100 caracteres")
         String productVersion,

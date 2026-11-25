@@ -133,7 +133,7 @@ public class AssetController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('ROLE_ANALYST')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('ROLE_ANALYST') or hasAuthority('ROLE_INTERNAL')")
     public ResponseEntity<AssetResponseDto> createAsset(@Valid @RequestBody CreateAssetRequestDto request) {
         Asset created = assetUseCase.create(
                 IpAddress.of(request.ip()),
