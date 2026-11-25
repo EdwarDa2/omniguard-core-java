@@ -211,6 +211,9 @@ app:
   audit:
     enabled: true
     async: true
+  redis:
+    scan-commands-channel: ${SCAN_COMMANDS_CHANNEL:scan_commands_channel}
+    sensor-commands-channel: ${SENSOR_COMMANDS_CHANNEL:sensor_commands_channel}
 
 internal:
   api:

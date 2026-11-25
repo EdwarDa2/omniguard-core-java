@@ -98,10 +98,20 @@ public class DashboardController {
                 JsonNode node = objectMapper.readTree(trafficJson);
                 currentPacketsPerSec = node.path("packets_per_sec").asLong(0L);
                 bandwidthMbps = node.path("bandwidth_mbps").asDouble(0.0);
-                sensorStatus = node.path("sensor_status").asText("ACTIVE");
+                sensorStatus = node.path("sensor_status").asText("");
             }
         } catch (Exception e) {
             log.warn("Error leyendo telemetría en tiempo real desde Redis: {}", e.getMessage());
+        }
+
+        // Si metrics:traffic:latest no reporta estado o está vacío, consultar sensor:desired_state
+        if (sensorStatus == null || sensorStatus.isBlank() || "INACTIVE".equalsIgnoreCase(sensorStatus)) {
+            String desired = redisTemplate.opsForValue().get("sensor:desired_state");
+            if (desired != null && !desired.isBlank()) {
+                sensorStatus = desired;
+            } else {
+                sensorStatus = "INACTIVE";
+            }
         }
 
         // 4. Serie temporal verídica: devolver datos únicamente cuando exista una fuente histórica real en Redis; mientras tanto, lista vacía

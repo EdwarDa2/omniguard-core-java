@@ -1,6 +1,7 @@
 package com.omniguard.adapter.in.rest.sse;
 
 import com.omniguard.adapter.in.rest.dto.response.AlertResponseDto;
+import com.omniguard.adapter.in.rest.dto.response.DashboardStatsResponseDto;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -149,6 +150,41 @@ public class AlertSseService {
         for (SseEmitter emitter : emitters) {
             try {
                 emitter.send(SseEmitter.event().name("scan:completed").data(payload));
+            } catch (Exception e) {
+                emitters.remove(emitter);
+            }
+        }
+    }
+
+    public void broadcastSensorStatus(String status) {
+        if (emitters.isEmpty()) {
+            return;
+        }
+
+        Map<String, Object> payload = Map.of(
+                "status", status,
+                "timestamp", Instant.now().toString()
+        );
+
+        log.info("Broadcasting sensor:status event via SSE: status={} to {} clients", status, emitters.size());
+
+        for (SseEmitter emitter : emitters) {
+            try {
+                emitter.send(SseEmitter.event().name("sensor:status").data(payload));
+            } catch (Exception e) {
+                emitters.remove(emitter);
+            }
+        }
+    }
+
+    public void broadcastTrafficActivity(DashboardStatsResponseDto.TrafficActivityDto trafficActivity) {
+        if (emitters.isEmpty()) {
+            return;
+        }
+
+        for (SseEmitter emitter : emitters) {
+            try {
+                emitter.send(SseEmitter.event().name("traffic:metrics").data(trafficActivity));
             } catch (Exception e) {
                 emitters.remove(emitter);
             }
