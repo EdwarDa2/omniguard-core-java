@@ -74,21 +74,38 @@ public class InternalTelemetryController {
             JsonNode rootNode = objectMapper.readTree(rawPayload);
             String latestMetrics;
             String historyMetrics = null;
+            String sensorId = "default-host";
 
             if (rootNode.has("metrics")) {
-                latestMetrics = rootNode.path("metrics").toString();
+                JsonNode metricsNode = rootNode.path("metrics");
+                latestMetrics = metricsNode.toString();
+                if (metricsNode.has("sensor_id")) {
+                    sensorId = metricsNode.path("sensor_id").asText("default-host");
+                }
                 if (rootNode.has("history")) {
                     historyMetrics = rootNode.path("history").toString();
                 }
             } else {
                 latestMetrics = rootNode.toString();
+                if (rootNode.has("sensor_id")) {
+                    sensorId = rootNode.path("sensor_id").asText("default-host");
+                }
             }
 
-            // Almacenar en Redis con TTL de 15 segundos
-            redisTemplate.opsForValue().set(KEY_METRICS_LATEST, latestMetrics, Duration.ofSeconds(15));
+            // Sanitizar identificador de sensor
+            String sanitizedSensor = sensorId.replaceAll("[^a-zA-Z0-9_-]", "_");
 
-            // Si viene historial, almacenarlo con TTL de 60 segundos
+            // 1. Almacenar por sensor específico con TTL de 25 segundos
+            String sensorLatestKey = "metrics:traffic:" + sanitizedSensor + ":latest";
+            String sensorHistoryKey = "metrics:traffic:" + sanitizedSensor + ":history";
+            redisTemplate.opsForValue().set(sensorLatestKey, latestMetrics, Duration.ofSeconds(25));
+
+            // 2. Almacenar también en clave global para fallback
+            redisTemplate.opsForValue().set(KEY_METRICS_LATEST, latestMetrics, Duration.ofSeconds(25));
+
+            // Si viene historial, almacenarlo por sensor y global
             if (historyMetrics != null && !historyMetrics.isBlank()) {
+                redisTemplate.opsForValue().set(sensorHistoryKey, historyMetrics, Duration.ofSeconds(60));
                 redisTemplate.opsForValue().set(KEY_METRICS_HISTORY, historyMetrics, Duration.ofSeconds(60));
             }
 

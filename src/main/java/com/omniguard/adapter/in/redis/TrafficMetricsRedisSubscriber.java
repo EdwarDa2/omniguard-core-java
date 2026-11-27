@@ -46,10 +46,16 @@ public class TrafficMetricsRedisSubscriber implements MessageListener {
             long packetsPerSec = node.path("packets_per_sec").asLong(0L);
             double bandwidthMbps = node.path("bandwidth_mbps").asDouble(0.0);
             String sensorStatus = node.path("sensor_status").asText("ACTIVE");
+            String sensorId = node.path("sensor_id").asText("default-host");
 
-            // Leer serie temporal acumulada en Redis
+            // Leer serie temporal acumulada en Redis (por sensor o global)
             List<DashboardStatsResponseDto.TimeSeriesPointDto> timeSeries = Collections.emptyList();
-            String historyJson = redisTemplate.opsForValue().get("metrics:traffic:history");
+            String sanitizedSensor = sensorId.replaceAll("[^a-zA-Z0-9_-]", "_");
+            String historyKey = "metrics:traffic:" + sanitizedSensor + ":history";
+            String historyJson = redisTemplate.opsForValue().get(historyKey);
+            if (historyJson == null || historyJson.isBlank()) {
+                historyJson = redisTemplate.opsForValue().get("metrics:traffic:history");
+            }
             if (historyJson != null && !historyJson.isBlank()) {
                 JsonNode historyNode = objectMapper.readTree(historyJson);
                 if (historyNode.isArray() && !historyNode.isEmpty()) {
@@ -70,7 +76,8 @@ public class TrafficMetricsRedisSubscriber implements MessageListener {
                             packetsPerSec,
                             bandwidthMbps,
                             sensorStatus,
-                            timeSeries
+                            timeSeries,
+                            sensorId
                     );
 
             alertSseService.broadcastTrafficActivity(trafficActivity);

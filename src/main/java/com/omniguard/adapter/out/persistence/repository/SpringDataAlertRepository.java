@@ -22,6 +22,12 @@ public interface SpringDataAlertRepository extends JpaRepository<AlertJpaEntity,
     @Query("SELECT COUNT(a) FROM AlertJpaEntity a WHERE a.status = 'ACTIVE' OR a.status = 'OPEN'")
     long countActive();
 
+    @Query("SELECT COUNT(a) FROM AlertJpaEntity a WHERE (a.status = 'ACTIVE' OR a.status = 'OPEN') AND a.detectedAt >= :since")
+    long countActiveSince(@Param("since") Instant since);
+
+    @Query("SELECT a FROM AlertJpaEntity a WHERE a.detectedAt >= :since ORDER BY a.detectedAt DESC")
+    java.util.List<AlertJpaEntity> findRecentSince(@Param("since") Instant since, org.springframework.data.domain.Pageable pageable);
+
     default long countRecent(Instant after) {
         return countByDetectedAtAfter(after);
     }

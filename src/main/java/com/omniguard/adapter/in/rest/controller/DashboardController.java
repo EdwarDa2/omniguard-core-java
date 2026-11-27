@@ -57,48 +57,54 @@ public class DashboardController {
 
     @GetMapping("/stats")
     @Operation(summary = "Métricas consolidadas del Dashboard", description = "Consolida los 4 KPIs principales, telemetría de tráfico y alertas recientes")
-    public ResponseEntity<DashboardStatsResponseDto> getDashboardStats() {
-        // 1. Calcular KPIs
-        long openPorts = serviceRepository.count();
-        long activeThreats = alertRepository.countActive();
-        long vulnerableAssets = cveRecordRepository.countVulnerableAssets();
-        Instant since24h = Instant.now().minus(24, ChronoUnit.HOURS);
-        long alerts24h = alertRepository.countRecent(since24h);
+    public ResponseEntity<DashboardStatsResponseDto> getDashboardStats(
+            @org.springframework.web.bind.annotation.RequestParam(name = "sensor_id", required = false) String sensorId,
+            @org.springframework.web.bind.annotation.RequestParam(name = "since", required = false) String sinceIso
+    ) {
+        // Filtrado temporal para ciclo de vida de alertas por sesión activa (Opción C)
+        Instant sessionSince = null;
+        if (sinceIso != null && !sinceIso.isBlank()) {
+            try {
+                sessionSince = Instant.parse(sinceIso);
+            } catch (Exception e) {
+                log.warn("Formato ISO inválido en parámetro since: {}", sinceIso);
+            }
+        }
 
-        DashboardStatsResponseDto.KpisDto kpis = new DashboardStatsResponseDto.KpisDto(
-                new DashboardStatsResponseDto.KpiItemDto("Open Ports", openPorts, openPorts > 0 ? "CRITICAL" : "NORMAL"),
-                new DashboardStatsResponseDto.KpiItemDto("Active Threats", activeThreats, activeThreats > 0 ? "HIGH" : "NORMAL"),
-                new DashboardStatsResponseDto.KpiItemDto("Vulnerable Assets", vulnerableAssets, vulnerableAssets > 0 ? "WARNING" : "NORMAL"),
-                new DashboardStatsResponseDto.KpiItemDto("Alerts (24h)", alerts24h, "NORMAL")
-        );
+        // Determinar claves de Redis (segmentadas por sensor_id si está presente)
+        String targetLatestKey = "metrics:traffic:latest";
+        String targetHistoryKey = "metrics:traffic:history";
+        String activeSensorId = (sensorId != null && !sensorId.isBlank()) ? sensorId : "default-host";
 
-        // 2. Alertas recientes (top 4-5)
-        List<AlertJpaEntity> recentAlertEntities = alertRepository.findAll(
-                PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "detectedAt"))
-        ).getContent();
+        if (sensorId != null && !sensorId.isBlank()) {
+            String sanitizedSensor = sensorId.replaceAll("[^a-zA-Z0-9_-]", "_");
+            String specificKey = "metrics:traffic:" + sanitizedSensor + ":latest";
+            if (Boolean.TRUE.equals(redisTemplate.hasKey(specificKey))) {
+                targetLatestKey = specificKey;
+                targetHistoryKey = "metrics:traffic:" + sanitizedSensor + ":history";
+                activeSensorId = sensorId;
+            }
+        }
 
-        List<DashboardStatsResponseDto.RecentAlertDto> recentAlerts = recentAlertEntities.stream()
-                .map(a -> new DashboardStatsResponseDto.RecentAlertDto(
-                        String.valueOf(a.getId()),
-                        TIME_FORMATTER.format(a.getDetectedAt()),
-                        a.getSourceIp(),
-                        a.getTitle() != null ? a.getTitle() : a.getRule(),
-                        mapSeverityToFrontend(a.getSeverity())
-                ))
-                .toList();
-
-        // 3. Actividad de tráfico en tiempo real (consultada desde Redis metrics:traffic:latest)
+        // 1. Actividad de tráfico y auditoría en tiempo real (consultada desde Redis)
         long currentPacketsPerSec = 0L;
         double bandwidthMbps = 0.0;
         String sensorStatus = "INACTIVE";
+        long openPorts = 0L;
 
         try {
-            String trafficJson = redisTemplate.opsForValue().get("metrics:traffic:latest");
+            String trafficJson = redisTemplate.opsForValue().get(targetLatestKey);
             if (trafficJson != null && !trafficJson.isBlank()) {
                 JsonNode node = objectMapper.readTree(trafficJson);
                 currentPacketsPerSec = node.path("packets_per_sec").asLong(0L);
                 bandwidthMbps = node.path("bandwidth_mbps").asDouble(0.0);
                 sensorStatus = node.path("sensor_status").asText("");
+                if (node.has("open_ports")) {
+                    openPorts = node.path("open_ports").asLong(0L);
+                }
+                if (node.has("sensor_id")) {
+                    activeSensorId = node.path("sensor_id").asText(activeSensorId);
+                }
             }
         } catch (Exception e) {
             log.warn("Error leyendo telemetría en tiempo real desde Redis: {}", e.getMessage());
@@ -114,10 +120,43 @@ public class DashboardController {
             }
         }
 
+        // 2. Calcular KPIs (si hay sesión activa, limitar activeThreats a las surgidas desde el inicio de sesión)
+        long activeThreats = (sessionSince != null)
+                ? alertRepository.countActiveSince(sessionSince)
+                : alertRepository.countActive();
+        long vulnerableAssets = cveRecordRepository.countVulnerableAssets();
+        Instant since24h = Instant.now().minus(24, ChronoUnit.HOURS);
+        long alerts24h = alertRepository.countRecent(since24h);
+
+        String openPortsSeverity = openPorts > 15 ? "CRITICAL" : (openPorts > 5 ? "WARNING" : "NORMAL");
+
+        DashboardStatsResponseDto.KpisDto kpis = new DashboardStatsResponseDto.KpisDto(
+                new DashboardStatsResponseDto.KpiItemDto("Open Ports", openPorts, openPortsSeverity),
+                new DashboardStatsResponseDto.KpiItemDto("Active Threats", activeThreats, activeThreats > 0 ? "HIGH" : "NORMAL"),
+                new DashboardStatsResponseDto.KpiItemDto("Vulnerable Assets", vulnerableAssets, vulnerableAssets > 0 ? "WARNING" : "NORMAL"),
+                new DashboardStatsResponseDto.KpiItemDto("Alerts (24h)", alerts24h, "NORMAL")
+        );
+
+        // 3. Alertas recientes (filtradas por sesión activa si se especificó since; en caso contrario, últimas 5 globales)
+        List<AlertJpaEntity> recentAlertEntities = (sessionSince != null)
+                ? alertRepository.findRecentSince(sessionSince, PageRequest.of(0, 5))
+                : alertRepository.findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "detectedAt"))).getContent();
+
+        List<DashboardStatsResponseDto.RecentAlertDto> recentAlerts = recentAlertEntities.stream()
+                .map(a -> new DashboardStatsResponseDto.RecentAlertDto(
+                        String.valueOf(a.getId()),
+                        TIME_FORMATTER.format(a.getDetectedAt()),
+                        a.getSourceIp(),
+                        a.getTitle() != null ? a.getTitle() : a.getRule(),
+                        mapSeverityToFrontend(a.getSeverity()),
+                        a.getDetectedAt() != null ? a.getDetectedAt().toString() : Instant.now().toString()
+                ))
+                .toList();
+
         // 4. Serie temporal verídica: devolver datos únicamente cuando exista una fuente histórica real en Redis; mientras tanto, lista vacía
         List<DashboardStatsResponseDto.TimeSeriesPointDto> timeSeries = java.util.Collections.emptyList();
         try {
-            String historyJson = redisTemplate.opsForValue().get("metrics:traffic:history");
+            String historyJson = redisTemplate.opsForValue().get(targetHistoryKey);
             if (historyJson != null && !historyJson.isBlank()) {
                 JsonNode historyNode = objectMapper.readTree(historyJson);
                 if (historyNode.isArray() && !historyNode.isEmpty()) {
@@ -141,7 +180,8 @@ public class DashboardController {
                         currentPacketsPerSec,
                         bandwidthMbps,
                         sensorStatus,
-                        timeSeries
+                        timeSeries,
+                        activeSensorId
                 );
 
         return ResponseEntity.ok(new DashboardStatsResponseDto(kpis, trafficActivity, recentAlerts));

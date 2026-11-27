@@ -24,8 +24,13 @@ public record DashboardStatsResponseDto(
             long currentPacketsPerSec,
             double bandwidthMbps,
             String sensorStatus,
-            List<TimeSeriesPointDto> timeSeries
-    ) {}
+            List<TimeSeriesPointDto> timeSeries,
+            String sensorId
+    ) {
+        public TrafficActivityDto(long currentPacketsPerSec, double bandwidthMbps, String sensorStatus, List<TimeSeriesPointDto> timeSeries) {
+            this(currentPacketsPerSec, bandwidthMbps, sensorStatus, timeSeries, "default-host");
+        }
+    }
 
     public record TimeSeriesPointDto(
             String time,
@@ -38,6 +43,11 @@ public record DashboardStatsResponseDto(
             String time,
             String sourceIp,
             String threat,
-            String severity
-    ) {}
+            String severity,
+            String timestamp
+    ) {
+        public RecentAlertDto(String id, String time, String sourceIp, String threat, String severity) {
+            this(id, time, sourceIp, threat, severity, null);
+        }
+    }
 }
