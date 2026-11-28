@@ -1,7 +1,10 @@
 package com.omniguard.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.omniguard.adapter.in.rest.security.PasetoAuthenticationFilter;
+import com.omniguard.adapter.in.rest.security.RateLimitFilter;
 import com.omniguard.adapter.out.security.paseto.PasetoTokenService;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -25,17 +28,24 @@ import java.util.List;
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true, securedEnabled = true, jsr250Enabled = true)
+@EnableConfigurationProperties(RateLimitProperties.class)
 public class SecurityConfig {
 
     private final PasetoTokenService pasetoTokenService;
     private final com.omniguard.adapter.in.rest.security.InternalApiTokenFilter internalApiTokenFilter;
+    private final RateLimitProperties rateLimitProperties;
+    private final ObjectMapper objectMapper;
 
     public SecurityConfig(
             PasetoTokenService pasetoTokenService,
-            com.omniguard.adapter.in.rest.security.InternalApiTokenFilter internalApiTokenFilter
+            com.omniguard.adapter.in.rest.security.InternalApiTokenFilter internalApiTokenFilter,
+            RateLimitProperties rateLimitProperties,
+            ObjectMapper objectMapper
     ) {
         this.pasetoTokenService = pasetoTokenService;
         this.internalApiTokenFilter = internalApiTokenFilter;
+        this.rateLimitProperties = rateLimitProperties;
+        this.objectMapper = objectMapper;
     }
 
     @Bean
@@ -62,6 +72,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/alerts/stream").authenticated()
                 .anyRequest().authenticated()
             )
+            // El Rate Limiting se evalua primero para rechazar abusos antes de procesar credenciales
+            .addFilterBefore(new RateLimitFilter(rateLimitProperties, objectMapper), UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(internalApiTokenFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(pasetoAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
             .headers(headers -> headers

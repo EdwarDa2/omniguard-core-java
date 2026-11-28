@@ -183,10 +183,13 @@ paseto:
   private-key: ${PASETO_PRIVATE_KEY:}      # Base64 encoded Ed25519 private key
 
 # ============================================================
-# Rate Limiting (Bucket4j + Redis)
+# Rate Limiting (Bucket4j - Token Bucket por IP cliente)
+# Aplicado por RateLimitFilter. Responde HTTP 429 + Retry-After.
 # ============================================================
 bucket4j:
-  enabled: true
+  enabled: ${RATE_LIMIT_ENABLED:true}
+  # Confiar en X-Real-IP / X-Forwarded-For (solo detras del proxy Nginx)
+  trust-forwarded-headers: ${RATE_LIMIT_TRUST_FORWARDED_HEADERS:true}
   filters:
     - url-pattern: /api/v1/auth/login
       rate-limit: 5

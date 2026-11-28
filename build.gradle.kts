@@ -64,6 +64,11 @@ dependencies {
     implementation("io.lettuce:lettuce-core")
 
     // ============================================================
+    // Rate Limiting (algoritmo Token Bucket)
+    // ============================================================
+    implementation("com.bucket4j:bucket4j-core:8.10.1")
+
+    // ============================================================
     // Seguridad & Criptografía (Argon2id vía BouncyCastle)
     // ============================================================
     implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
@@ -101,7 +106,6 @@ dependencies {
     testImplementation("org.springframework.security:spring-security-test")
     testImplementation("org.testcontainers:junit-jupiter:1.19.3")
     testImplementation("org.testcontainers:postgresql:1.19.3")
-    testImplementation("org.testcontainers:redis:1.19.3")
     testImplementation("org.mockito:mockito-core:5.8.0")
     testImplementation("org.mockito:mockito-junit-jupiter:5.8.0")
     testImplementation("org.assertj:assertj-core:3.24.2")
@@ -111,7 +115,6 @@ dependencies {
     "integrationTestImplementation"("org.springframework.boot:spring-boot-starter-test")
     "integrationTestImplementation"("org.testcontainers:junit-jupiter:1.19.3")
     "integrationTestImplementation"("org.testcontainers:postgresql:1.19.3")
-    "integrationTestImplementation"("org.testcontainers:redis:1.19.3")
 
     // ============================================================
     // DevTools (optional, solo desarrollo)
